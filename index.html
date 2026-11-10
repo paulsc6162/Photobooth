@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#111111">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>Serendipity Photo Booth</title>
+<style>
+  @font-face { font-family: "Booth Serif"; src: url("fonts/InstrumentSerif-Italic.ttf") format("truetype");
+               font-style: italic; font-weight: 400; font-display: block; }
+  :root {
+    --bg: #111; --fg: #fff; --accent: #c9a24a; --accent-dark: #a5822f;
+    --muted: #9a9a9a; --danger: #d9534f; --olive: #8a9a3b; --olive-light: #b5c568; --radius: 18px; --panel: #1b1b1b;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+  }
+  .screen { position: fixed; inset: 0; display: none; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center; }
+  .screen.active { display: flex; }
+  h1 { font-size: clamp(2rem, 5vw, 4rem); margin: 0 0 .3em; font-weight: 700; }
+  h2 { font-size: clamp(1.5rem, 3.4vw, 2.6rem); margin: 0 0 .6em; font-weight: 600; }
+  p  { font-size: clamp(1rem, 2vw, 1.5rem); color: var(--muted); margin: .3em 0; }
+
+  .btn { border: 0; border-radius: var(--radius); font-size: clamp(1.1rem, 2.3vw, 1.8rem);
+         font-weight: 700; padding: .8em 1.5em; color: #111; background: var(--accent); cursor: pointer; }
+  .btn:active { transform: scale(.97); background: var(--accent-dark); }
+  .btn.secondary { background: #2b2b2b; color: var(--fg); }
+  .btn.secondary:active { background: #3a3a3a; }
+  .btn.on { background: #3a2f17; color: var(--accent); box-shadow: inset 0 0 0 3px var(--accent); }
+  .row { display: flex; gap: 1em; justify-content: center; flex-wrap: wrap; }
+
+  /* Attract */
+  #attract { background: radial-gradient(circle at 50% 40%, #2a2215 0%, #111 70%); }
+  #attract .venue { font-family: "Booth Serif", serif; font-style: italic; font-weight: 400;
+                    font-size: clamp(3.4rem, 12vw, 7rem); line-height: 1.2; padding: 0 .15em .12em; margin-bottom: 0;
+                    background: linear-gradient(180deg, var(--olive-light), #6f7f2a);
+                    -webkit-background-clip: text; background-clip: text; color: transparent;
+                    filter: drop-shadow(0 3px 10px rgba(0,0,0,.5)); }
+  #attract .sprig { color: var(--olive); font-size: clamp(1.2rem, 3vw, 1.8rem); letter-spacing: .4em; margin-bottom: 1.2em; opacity: .9; }
+  #attract .pulse { animation: pulse 2s ease-in-out infinite; margin-top: 1.4em; font-size: clamp(1.4rem, 3vw, 2.4rem); }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+  .hostLink { position: absolute; bottom: 5vh; background: none; border: 2px solid #444; color: #ddd;
+              border-radius: 999px; padding: .7em 1.4em; font-size: clamp(1rem, 2.6vw, 1.4rem); }
+  #hostBanner .partyName { font-family: "Booth Serif", Georgia, serif; font-style: italic; font-weight: 400; color: #f4efdc;
+              font-size: clamp(2.4rem, 8vw, 4.5rem); margin: .1em 0 .2em; }
+  #host { background: #151515; padding: 4vh 6vw; overflow-y: auto; justify-content: flex-start; }
+  #host .panel { width: min(760px, 100%); text-align: left; margin: auto 0; }
+  #host .lead { margin-bottom: 1.2em; }
+  #host .row { justify-content: flex-start; margin-top: .8em; }
+  .hostInput { width: 100%; font-size: clamp(1.3rem, 3.4vw, 2rem); padding: .55em .8em; border-radius: var(--radius);
+               border: 2px solid #333; background: #0c0c0c; color: #fff; outline: none; margin-bottom: 1em;
+               user-select: text; -webkit-user-select: text; }
+  .hostInput:focus { border-color: var(--accent); }
+  .hostNote { background: #2a2215; color: #f1dca6; border-radius: 12px; padding: .7em 1em; margin-bottom: 1em;
+              font-size: clamp(1rem, 2.4vw, 1.3rem); }
+
+  /* Start-screen slideshow (party mode) */
+  #slides { position: absolute; inset: 0; display: none; background: #000; }
+  #attract.slideshow #slides { display: block; }
+  .slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1.4s ease; }
+  .slide.show { opacity: 1; }
+  .attractInner { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; }
+  #attract.slideshow .attractInner { position: absolute; left: 0; right: 0; bottom: 0; padding: 14vh 6vw 10vh;
+      background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.82) 45%); }
+  #attract.slideshow h1, #attract.slideshow .sprig, #attract.slideshow #defaultBlurb { display: none; }
+  #attract.slideshow .venue { font-size: clamp(2.2rem, 7vw, 3.6rem); }
+  #attract .hostLink { z-index: 3; }
+  #galleryCorner { margin-top: 3vh; background: #fff; color: #222; border-radius: 18px; padding: 12px 18px 12px 12px;
+                   display: flex; align-items: center; gap: 14px; text-align: left;
+                   font-size: clamp(1rem, 2.8vw, 1.5rem); font-weight: 700; line-height: 1.2; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+  #galleryCorner[hidden] { display: none; }
+  #attractQR { width: clamp(120px, 20vw, 190px); height: auto; image-rendering: pixelated; }
+  #hostQRBox { background: #fff; color: #222; border-radius: 16px; padding: 14px; text-align: center; margin: 0 0 1.2em; }
+  #hostQRBox canvas { width: min(240px, 50vw); image-rendering: pixelated; }
+  #hostQRBox p { color: #333; margin: .4em 0 0; font-size: 1rem; }
+
+  /* Accept → saving → Take it home (same screen, buttons swap for the QR code) */
+  #editBar { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8em; }
+  #editBar[hidden] { display: none; }
+  #editBar .btn { padding: .75em .5em; }
+  .aiBtn { background: linear-gradient(135deg, #5b3fa8, #b0428f) !important; color: #fff !important; }
+  .aiBtn.on { box-shadow: inset 0 0 0 3px #f4d27a; }
+
+  /* AI theme screen */
+  #ai { background: radial-gradient(circle at 50% 20%, #2b2340 0%, #111 70%); padding: 4vh 5vw; overflow-y: auto; justify-content: flex-start; }
+  .aiInner { width: min(980px, 100%); display: flex; flex-direction: column; align-items: center; margin: auto 0; }
+  .aiTitle { font-size: clamp(2.2rem, 7vw, 3.6rem); margin: 0 0 .2em; }
+  .aiSub { font-size: clamp(1.1rem, 3.2vw, 1.6rem); color: #ddd; margin: 0 0 1.4em; }
+  .aiModes { display: flex; flex-direction: column; gap: 1.2em; width: 100%; max-width: 680px; }
+  .modeBtn { display: flex; align-items: center; gap: .8em; text-align: left; border: 0; border-radius: 22px; padding: 1.1em 1.3em;
+             background: #241f33; color: #fff; box-shadow: inset 0 0 0 2px #4a3f6b; cursor: pointer; }
+  .modeBtn:active { transform: scale(.98); }
+  .modeBtn .mi { font-size: clamp(2.4rem, 7vw, 3.4rem); }
+  .modeBtn b { display: block; font-size: clamp(1.3rem, 3.8vw, 2rem); }
+  .modeBtn small { display: block; color: #bbb; font-size: clamp(.95rem, 2.6vw, 1.3rem); margin-top: .2em; }
+  .themeGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1em; width: 100%; }
+  .themeGrid[hidden], .aiModes[hidden] { display: none; }
+  .themeTile { border: 0; border-radius: 20px; aspect-ratio: 1 / 1.05; color: #fff; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; gap: .25em; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.4);
+               text-shadow: 0 2px 6px rgba(0,0,0,.45); }
+  .themeTile:active { transform: scale(.96); }
+  .themeTile .te { font-size: clamp(2.6rem, 9vw, 4.4rem); line-height: 1; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
+  .themeTile .tl { font-weight: 800; font-size: clamp(1rem, 2.9vw, 1.4rem); padding: 0 .4em; text-align: center; }
+  .aiNote { color: #aaa; font-size: clamp(.9rem, 2.4vw, 1.15rem); margin: 1.6em 0 1em; text-align: center; }
+  #aiBusy { position: absolute; inset: 0; background: rgba(10,8,16,.94); display: flex; flex-direction: column; align-items: center;
+            justify-content: center; text-align: center; padding: 0 8vw; z-index: 10; }
+  #aiBusy[hidden] { display: none; }
+  #aiBusy h2 { font-size: clamp(1.8rem, 6vw, 3rem); }
+  .aiProgress { width: min(520px, 80vw); height: 10px; background: #2e2840; border-radius: 99px; overflow: hidden; margin-top: 1.5em; }
+  #aiBar { height: 100%; width: 0; background: linear-gradient(90deg, #8a6ad8, #e06fb3); border-radius: 99px; }
+  #glamBtn.on { background: #3a2f17; color: var(--accent); box-shadow: inset 0 0 0 3px var(--accent); }
+  .bar.saving { justify-content: center; gap: 1em; font-size: clamp(1.2rem, 3.4vw, 1.8rem); padding: 3vh; }
+  .bar.saving[hidden], #takeHome[hidden] { display: none; }
+  .spinner.sm { width: 40px; height: 40px; border-width: 5px; margin: 0; }
+  #takeHome { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; flex-direction: column; align-items: center;
+              padding: 6vh 4vw 3vh; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.88) 30%); }
+  .thTitle { font-family: "Booth Serif", Georgia, serif; font-style: italic; color: #f4efdc; font-size: clamp(2.6rem, 9vw, 4.6rem); line-height: 1.1; margin-bottom: .2em; }
+  .thCard { background: #fff; border-radius: 22px; padding: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+  .thCard canvas { display: block; width: min(52vw, 30vh); height: auto; image-rendering: pixelated; }
+  .thNote { color: #ddd; font-size: clamp(1rem, 2.8vw, 1.4rem); margin-top: 1.2vh; text-align: center; }
+  .thDone { margin-top: 1.4vh; background: none; border: 2px solid #555; color: #ddd; border-radius: 999px; padding: .5em 2em; font-size: clamp(1rem, 2.6vw, 1.3rem); }
+
+
+  /* Camera */
+  #camera { background: #000; }
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  #video.mirror { transform: scaleX(-1); }
+  #countdown { position: absolute; font-size: min(40vw, 40vh); font-weight: 800; color: #fff;
+               text-shadow: 0 0 40px rgba(0,0,0,.6); pointer-events: none; }
+  #countdown.tick { animation: tick 1s ease-out; }
+  @keyframes tick { 0% { transform: scale(1.6); opacity: 0; } 20% { opacity: 1; } 100% { transform: scale(.8); opacity: .2; } }
+  #camHint { position: absolute; bottom: 5vh; left: 0; right: 0; color: #fff;
+             font-size: clamp(1.2rem, 2.6vw, 2rem); text-shadow: 0 2px 8px #000; }
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
+  #flash.go { animation: flash .5s ease-out; }
+  @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* Edit / review */
+  #edit { background: #000; justify-content: stretch; align-items: stretch; }
+  #photoWrap { flex: 1; min-height: 0; position: relative; }
+  #photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .bar { background: #111; padding: 1.4vh 1.5vw; display: flex; gap: .8em; justify-content: space-between; align-items: center; }
+  .bar .group { display: flex; gap: .8em; }
+  .bar .btn { padding: .7em 1.1em; }
+
+  /* Send */
+  label.field { display: block; font-size: clamp(1rem, 1.8vw, 1.3rem); color: var(--muted); margin-bottom: .4em; }
+  .check { display: flex; gap: .8em; align-items: flex-start; margin: 1em 0; font-size: clamp(.95rem, 1.7vw, 1.2rem); color: #ccc; }
+  .check input { width: 1.6em; height: 1.6em; flex: 0 0 auto; accent-color: var(--accent); }
+  .err { color: var(--danger); min-height: 1.5em; font-size: clamp(1rem, 1.8vw, 1.3rem); margin: .3em 0; }
+
+  .spinner { width: 90px; height: 90px; border: 8px solid #333; border-top-color: var(--accent);
+             border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1.5em; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Setup settings (hidden: tap top-left corner 5 times) */
+  #staffHotspot { position: fixed; top: 0; left: 0; width: 60px; height: 60px; z-index: 100; }
+  #staffPin { background: rgba(0,0,0,.94); z-index: 200; padding: 4vh 6vw; }
+  .pinPanel { background: #1c1c1c; border-radius: var(--radius); padding: 2em; width: min(520px, 100%); }
+  .pinBox { text-align: center; letter-spacing: .5em; font-size: clamp(1.8rem, 6vw, 2.6rem); }
+  #settings { background: rgba(0,0,0,.92); z-index: 200; padding: 4vh 6vw; }
+  #settings .panel { background: #1c1c1c; border-radius: var(--radius); padding: 2em; width: min(700px, 100%); text-align: left; }
+  #settings select, #settings input[type=number] { width: 100%; font-size: 1.3rem; padding: .5em; border-radius: 10px;
+         background: #0c0c0c; color: #fff; border: 2px solid #333; margin-bottom: 1em; }
+  @media (orientation: portrait) {
+    .bar { flex-wrap: wrap; justify-content: space-between; padding: 1.2vh 3vw 2vh; }
+    .bar .group.tools { order: -1; width: 100%; justify-content: center; }
+    .bar .group.tools .btn { flex: 1; }
+    .bar .btn { font-size: clamp(1.2rem, 3.6vw, 2rem); padding: .75em 1.2em; }
+    .bar > .group:not(.tools) { flex: 1; }
+    .bar > .group:not(.tools) .btn { flex: 1; }
+    #camHint { bottom: 8vh; }
+    #editBar { grid-template-columns: 1fr 1fr; }
+    .aiModes { gap: 2.2vh; }
+    .modeBtn { padding: 1.6em 1.5em; }
+    .modeBtn .mi { font-size: clamp(3rem, 9vw, 4.4rem); }
+    .modeBtn b { font-size: clamp(1.5rem, 4.8vw, 2.3rem); }
+    .modeBtn small { font-size: clamp(1.05rem, 3.1vw, 1.45rem); }
+    #ai .btn { font-size: clamp(1.3rem, 3.8vw, 1.9rem); }
+    .aiNote { font-size: clamp(1rem, 2.8vw, 1.3rem); }
+              #attract h1 { font-size: clamp(2.6rem, 9vw, 5rem); }
+    #attract p { padding: 0 8vw; font-size: clamp(1.1rem, 3.4vw, 1.8rem); }
+    #attract .pulse { font-size: clamp(1.6rem, 5vw, 2.6rem); }
+  }
+</style>
+</head>
+<body>
+
+<!-- 1. Attract -->
+<section id="attract" class="screen active">
+  <div id="slides"><img class="slide" alt=""><img class="slide" alt=""></div>
+  <div class="attractInner">
+    <div class="venue">Serendipity</div>
+    <div class="sprig">— ❦ —</div>
+    <h1>Photo Booth</h1>
+    <div id="hostBanner" hidden>
+      <div class="partyName" id="bannerName"></div>
+    </div>
+    <p id="defaultBlurb">Strike a pose, add your own message, and scan the QR code to take your photo home</p>
+    <button class="btn pulse" id="startBtn">📸 Touch to start</button>
+    <div id="galleryCorner" hidden><canvas id="attractQR"></canvas><span>Scan to see all<br>the party photos</span></div>
+  </div>
+  <button class="hostLink" id="hostBtn">🎉 Hosting a party? Set your photo title</button>
+</section>
+
+<!-- Host setup -->
+<section id="host" class="screen">
+  <div class="panel">
+    <div id="hostLocked" hidden>
+      <h2>Party settings</h2>
+      <p>Enter the host's 4-digit PIN</p>
+      <input id="pinCheck" class="hostInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
+      <div class="err" id="pinErr"></div>
+      <div class="row"><button class="btn secondary" data-close-host>Cancel</button><button class="btn" id="pinOk">Unlock</button></div>
+    </div>
+    <div id="hostForm">
+      <h2>🎉 Set up your party</h2>
+      <p class="lead">Your title goes on every photo, and all the photos collect in a private online party gallery for <span class="keepDays">7</span> days. Guests scan a QR code to get their photo and the gallery.</p>
+      <div id="hostQRBox" hidden><canvas id="hostQR"></canvas><p>📱 Scan to open your party gallery – snap a picture of this code to keep it</p></div>
+      <label class="field" for="hostName">Photo title – appears on every picture</label>
+      <input id="hostName" class="hostInput" maxlength="32" autocomplete="off" placeholder="e.g. Maria's 50th">
+      <label class="field" for="hostPin">Choose a 4-digit PIN (to change or end the party)</label>
+      <input id="hostPin" class="hostInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••">
+      <div class="err" id="hostErr"></div>
+      <div class="row">
+        <button class="btn secondary" data-close-host>Cancel</button>
+        <button class="btn secondary" id="endParty" hidden>End party</button>
+        <button class="btn" id="startParty">Start party</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Camera + countdown -->
+<section id="camera" class="screen">
+  <video id="video" autoplay playsinline muted></video>
+  <div id="countdown"></div>
+  <div id="camHint">Get ready…</div>
+</section>
+<div id="flash"></div>
+
+<!-- 3. Edit / review -->
+<section id="edit" class="screen">
+  <div id="photoWrap">
+    <canvas id="photo"></canvas>
+  </div>
+
+  <div class="bar" id="editBar">
+    <button class="btn secondary" id="retakeBtn">↺ Retake</button>
+    <button class="btn secondary" id="glamBtn">✨ Glam it</button>
+    <button class="btn secondary aiBtn" id="aiBtn">🪄 AI theme it</button>
+    <button class="btn" id="acceptBtn">✓ Accept</button>
+  </div>
+
+  <div class="bar saving" id="savingBar" hidden><div class="spinner sm"></div><span id="savingText">Saving your photo…</span></div>
+
+  <div id="takeHome" hidden>
+    <div class="thTitle">Take it home</div>
+    <div class="thCard"><canvas id="qrPhoto"></canvas></div>
+    <div class="thNote" id="thNote">Scan with your phone camera</div>
+    <button class="thDone" id="doneBtn">Done</button>
+  </div>
+</section>
+
+<!-- AI theme it -->
+<section id="ai" class="screen">
+  <div class="aiInner">
+    <h1 class="aiTitle">🪄 AI theme it</h1>
+    <p class="aiSub" id="aiSub">How would you like to theme your photo?</p>
+
+    <div class="aiModes" id="aiModes">
+      <button class="modeBtn" data-mode="full"><span class="mi">🎭</span><span><b>Theme the entire picture</b><small>New outfits and a new background</small></span></button>
+      <button class="modeBtn" data-mode="background"><span class="mi">🏞️</span><span><b>Theme the background</b><small>Keep your outfits, change the scene</small></span></button>
+      <button class="modeBtn" data-mode="clothing"><span class="mi">👗</span><span><b>Theme the clothing</b><small>Keep the background, change the outfits</small></span></button>
+    </div>
+
+    <div class="themeGrid" id="aiThemes" hidden></div>
+
+    <p class="aiNote">Your photo is sent to Google's AI to create the themed version – it takes about 20 seconds.</p>
+    <div class="row">
+      <button class="btn secondary" id="aiBack">← Back</button>
+      <button class="btn secondary" id="aiOriginal" hidden>↺ Use my original photo</button>
+    </div>
+  </div>
+
+  <div id="aiBusy" hidden>
+    <div class="spinner"></div>
+    <h2 id="aiBusyTitle">Creating your photo…</h2>
+    <p>This takes about 20 seconds – keep smiling! ✨</p>
+    <div class="aiProgress"><div id="aiBar"></div></div>
+  </div>
+</section>
+
+<!-- 4. Error -->
+<section id="error" class="screen">
+  <h1>Hmm, that didn't work</h1>
+  <p id="errorMsg"></p>
+  <div class="row" style="margin-top:1.5em">
+    <button class="btn secondary" id="errHomeBtn">Start over</button>
+    <button class="btn" id="errRetryBtn">Try again</button>
+  </div>
+</section>
+
+<!-- One-time setup (tap top-left corner 5 times, then staff PIN) -->
+<div id="staffHotspot"></div>
+<section id="staffPin" class="screen">
+  <div class="panel pinPanel">
+    <h2 id="pinTitle">Staff PIN</h2>
+    <p id="pinHelp">Enter the staff PIN to open setup</p>
+    <input id="pinInput" class="hostInput pinBox" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="••••">
+    <input id="pinConfirm" class="hostInput pinBox" type="password" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="Repeat PIN" hidden>
+    <div class="err" id="pinMsg"></div>
+    <div class="row">
+      <button class="btn secondary" id="pinCancel">Cancel</button>
+      <button class="btn" id="pinGo">OK</button>
+    </div>
+  </div>
+</section>
+<section id="settings" class="screen">
+  <div class="panel">
+    <h2>Setup</h2>
+    <label class="field">Camera</label>
+    <select id="camSelect"></select>
+    <label class="field">Countdown (seconds)</label>
+    <input type="number" id="cdInput" min="1" max="10">
+    <label class="check"><input type="checkbox" id="mirrorInput"> Mirror the photo (like a selfie)</label>
+    <label class="check"><input type="checkbox" id="demoInput"> Demo mode (don't upload – QR codes won't work)</label>
+    <div class="row" style="justify-content:flex-start;margin-top:1em">
+      <button class="btn secondary" id="closeSettings">Close</button>
+      <button class="btn secondary" id="changePin">Change staff PIN</button>
+      <button class="btn secondary" id="fsBtn">Full screen</button>
+      <button class="btn" id="saveSettings">Save</button>
+    </div>
+  </div>
+</section>
+
+<script src="vendor/qr.js"></script>
+<script type="module">
+/* ============ CONFIG – edit these ============ */
+const CONFIG = {
+  uploadEndpoint: '/.netlify/functions/upload-photo',
+  galleryEndpoint: '/.netlify/functions/gallery',
+  boothKey: 'sb-s57OEBNB4i2wY959GdUYQwxTcDtkmTyFe0x1GGGo',  // must match BOOTH_KEY env var in Netlify
+  countdown: 5,
+  mirror: true,
+  idleResetSeconds: 90,        // back to start screen after this long untouched
+  keepDays: 7,                 // photos and party galleries stay online this long (match KEEP_DAYS in Netlify)
+  slideSeconds: 5,             // start-screen slideshow: seconds per photo
+  takeHomeSeconds: 45,
+  // "AI theme it": your Supabase Edge Function address (Supabase → Edge Functions → ai-theme → URL)
+  aiEndpoint: 'https://YOUR-PROJECT.supabase.co/functions/v1/ai-theme',         // how long the "Take it home" QR code stays up before returning to the start screen
+  partyMemoryHours: 8,         // next guest starts with the same text and style for this long
+  hostHours: 8,                // a host's party ends automatically after this long
+  maxLongEdge: 1920,
+  jpegQuality: 0.9,
+  watermark: 'Serendipity',
+  demo: false
+};
+/* ============================================= */
+
+function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+Object.assign(CONFIG, JSON.parse(safeGet('booth.settings.v2') || '{}'));
+
+const $ = id => document.getElementById(id);
+const video = $('video');
+const photo = $('photo'), pctx = photo.getContext('2d');
+let stream = null, busy = false, idleTimer = null, finalDataUrl = null, thumbDataUrl = null, glam = false, homeTimer = null;
+let aiCanvas = null, aiThemeLabel = '', aiMode = 'full', aiWorking = false;   // AI-themed version of the photo (null = original)
+
+document.querySelectorAll('.keepDays').forEach(e => e.textContent = CONFIG.keepDays);
+
+/* ---------- Party choices (remembered for the next guest) ---------- */
+const DEFAULT_PARTY = { text: '', style: 'elegant', pos: 'top', filter: 'natural' };
+let party = { ...DEFAULT_PARTY };
+try {
+  const p = JSON.parse(safeGet('booth.party') || 'null');
+  if (p && Date.now() - p.ts < CONFIG.partyMemoryHours * 3600e3) party = { ...DEFAULT_PARTY, ...p };
+} catch {}
+function saveParty() { safeSet('booth.party', JSON.stringify({ ...party, ts: Date.now() })); }
+
+/* ---------- Party host: sets the photo title; photos also collect in a party gallery ---------- */
+let host = null;   // { id, name, pin, ts }
+try {
+  const h = JSON.parse(safeGet('booth.host') || 'null');
+  if (h && h.id && Date.now() - h.ts < CONFIG.hostHours * 3600e3) host = h;
+} catch {}
+function saveHost() { host ? safeSet('booth.host', JSON.stringify(host)) : safeSet('booth.host', 'null'); }
+const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+const newId = (n = 14) => [...crypto.getRandomValues(new Uint8Array(n))].map(b => ID_CHARS[b % ID_CHARS.length]).join('');
+const pageUrl = (page, key, id) => new URL(`${page}?${key}=${encodeURIComponent(id)}`, location.href).href;
+const galleryUrl = () => pageUrl('g.html', 'g', host.id);
+
+function refreshAttract() {
+  // End the host's party automatically once it's run for hostHours (the gallery itself stays online for keepDays)
+  if (host && Date.now() - host.ts >= CONFIG.hostHours * 3600e3) {
+    host = null; saveHost(); party = { ...DEFAULT_PARTY }; saveParty();
+  }
+  $('hostBanner').hidden = !host;
+  $('defaultBlurb').hidden = !!host;
+  $('galleryCorner').hidden = !host;
+  if (host) { $('bannerName').textContent = host.name; drawQR($('attractQR'), galleryUrl()); }
+  $('hostBtn').textContent = host ? '⚙️ Party settings (host only)' : '🎉 Hosting a party? Set your photo title';
+  host ? startSlideshow() : stopSlideshow();
+}
+function openHost() {
+  $('hostErr').textContent = ''; $('pinErr').textContent = ''; $('pinCheck').value = '';
+  $('hostLocked').hidden = !host; $('hostForm').hidden = !!host; $('hostQRBox').hidden = true;
+  if (!host) { $('hostName').value = party.text || ''; $('hostPin').value = ''; $('endParty').hidden = true; $('startParty').textContent = 'Start party'; }
+  show('host');
+  setTimeout(() => (host ? $('pinCheck') : $('hostName')).focus(), 200);
+}
+$('hostBtn').onclick = e => { e.stopPropagation(); openHost(); };
+document.querySelectorAll('[data-close-host]').forEach(b => b.onclick = () => { refreshAttract(); show('attract'); });
+$('pinOk').onclick = () => {
+  if ($('pinCheck').value !== host.pin) { $('pinErr').textContent = 'Wrong PIN – please try again.'; return; }
+  $('hostLocked').hidden = true; $('hostForm').hidden = false;
+  $('hostName').value = host.name; $('hostPin').value = host.pin;
+  $('hostQRBox').hidden = false; drawQR($('hostQR'), galleryUrl());
+  $('endParty').hidden = false; $('startParty').textContent = 'Save';
+};
+$('pinCheck').addEventListener('keydown', e => { if (e.key === 'Enter') $('pinOk').click(); });
+$('startParty').onclick = () => {
+  const name = $('hostName').value.trim(), pin = $('hostPin').value.trim(), err = $('hostErr');
+  if (!name) return err.textContent = 'Please enter a photo title for your party.';
+  if (!/^\d{4}$/.test(pin)) return err.textContent = 'Please choose a 4-digit PIN.';
+  host = host ? { ...host, name, pin } : { id: newId(), name, pin, ts: Date.now() };
+  saveHost();
+  party.text = name; saveParty();
+  registerParty();
+  refreshAttract(); show('attract');
+};
+// Create the online gallery straight away, so its QR code works before the first photo
+function registerParty() {
+  if (!host || CONFIG.demo) return;
+  fetch(CONFIG.uploadEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Booth-Key': CONFIG.boothKey },
+    body: JSON.stringify({ action: 'party', party: { id: host.id, name: host.name } }) }).catch(() => {});
+}
+$('endParty').onclick = () => {
+  host = null; saveHost();
+  party = { ...DEFAULT_PARTY }; saveParty();
+  refreshAttract(); show('attract');
+};
+
+/* ---------- Start-screen slideshow of the party gallery ---------- */
+let slideList = [], slideIdx = 0, slideFront = 0, slideTimer = null, slidePoll = null;
+async function pollGallery() {
+  if (!host || CONFIG.demo) return;
+  try {
+    const r = await fetch(`${CONFIG.galleryEndpoint}?g=${encodeURIComponent(host.id)}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const d = await r.json();
+    const before = slideList.length ? slideList[0].id : null;
+    slideList = d.photos || [];
+    if (slideList.length && slideList[0].id !== before) slideIdx = 0;   // show the newest photo next
+    if (slideList.length && !slideTimer) nextSlide();
+  } catch {}
+}
+function nextSlide() {
+  clearTimeout(slideTimer); slideTimer = null;
+  const at = $('attract');
+  if (!host || !slideList.length || !at.classList.contains('active')) { at.classList.toggle('slideshow', !!(host && slideList.length)); return; }
+  const p = slideList[slideIdx++ % slideList.length];
+  const imgs = at.querySelectorAll('.slide'), back = imgs[1 - slideFront];
+  const pre = new Image();
+  pre.onload = () => {
+    back.src = p.url;
+    at.classList.add('slideshow');
+    back.classList.add('show'); imgs[slideFront].classList.remove('show');
+    slideFront = 1 - slideFront;
+    slideTimer = setTimeout(nextSlide, CONFIG.slideSeconds * 1000);
+  };
+  pre.onerror = () => { slideTimer = setTimeout(nextSlide, 1000); };
+  pre.src = p.url;
+}
+function startSlideshow() {
+  if (!host) return;
+  if (!slidePoll) slidePoll = setInterval(pollGallery, 30000);
+  pollGallery();                                   // check straight away for photos just taken
+  if (slideList.length && !slideTimer) nextSlide();
+}
+function stopSlideshow() {
+  clearInterval(slidePoll); slidePoll = null; clearTimeout(slideTimer); slideTimer = null; slideList = [];
+  $('attract').classList.remove('slideshow');
+  $('attract').querySelectorAll('.slide').forEach(i => { i.classList.remove('show'); i.removeAttribute('src'); });
+}
+
+/* ---------- QR codes (vendor/qr.js) ---------- */
+function drawQR(canvas, text) {
+  const m = window.BoothQR.matrix(text, 'M'), n = m.length, quiet = 3, scale = 8, size = (n + quiet * 2) * scale;
+  canvas.width = canvas.height = size;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#fff'; c.fillRect(0, 0, size, size); c.fillStyle = '#000';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (m[r][k]) c.fillRect((k + quiet) * scale, (r + quiet) * scale, scale, scale);
+}
+
+/* ---------- Screens & idle ---------- */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  if (id === 'attract') startSlideshow(); else { clearTimeout(slideTimer); slideTimer = null; }
+  resetIdle();
+}
+function resetIdle() {
+  clearTimeout(idleTimer);
+  if (aiWorking) return;                        // never time out while the AI is working
+  if (!['attract', 'host'].some(id => $(id).classList.contains('active')))
+    idleTimer = setTimeout(resetAll, CONFIG.idleResetSeconds * 1000);
+}
+['pointerdown', 'keydown', 'input'].forEach(ev => document.addEventListener(ev, resetIdle, true));
+
+/* ---------- Camera ---------- */
+async function startCamera() {
+  if (stream) return;
+  const portrait = innerHeight > innerWidth;
+  const c = portrait ? { width: { ideal: 1080 }, height: { ideal: 1920 } } : { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  if (CONFIG.deviceId) c.deviceId = { exact: CONFIG.deviceId }; else c.facingMode = 'user';
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: c, audio: false }); }
+  catch { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
+  video.srcObject = stream;
+  video.classList.toggle('mirror', !!CONFIG.mirror);
+  await video.play().catch(() => {});
+  await new Promise(r => video.readyState >= 2 ? r() : video.onloadeddata = r);
+}
+function stopCamera() { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; }
+
+/* ---------- The captured photo ---------- */
+const raw = document.createElement('canvas');      // the photo as taken (already mirrored)
+
+function captureFrame() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const s = Math.min(1, CONFIG.maxLongEdge / Math.max(vw, vh));
+  const w = Math.round(vw * s), h = Math.round(vh * s);
+  raw.width = photo.width = w;
+  raw.height = photo.height = h;
+  const r = raw.getContext('2d');
+  r.save();
+  if (CONFIG.mirror) { r.translate(w, 0); r.scale(-1, 1); }
+  r.drawImage(video, 0, 0, w, h);
+  r.restore();
+  aiCanvas = null; aiThemeLabel = '';
+  filterCache.clear();
+}
+
+/* ---------- "Glam it" filter (applied to the photo itself, before the title and Serendipity strip) ---------- */
+const filterCache = new Map();   // filter id → canvas, for the current photo
+function applyFilter(src, id, w, h) {
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const c = out.getContext('2d'), u = Math.min(w, h);
+  if (id === 'glam') {
+    // Soft-focus "beauty" look: brighter, slightly warm, with a blurred layer that smooths skin
+    c.filter = 'brightness(1.07) contrast(1.04) saturate(1.08)';
+    c.drawImage(src, 0, 0, w, h);
+    c.filter = `blur(${Math.max(2, u * 0.007)}px) brightness(1.1)`;
+    c.globalAlpha = 0.42; c.globalCompositeOperation = 'lighten';
+    c.drawImage(src, 0, 0, w, h);
+    c.globalAlpha = 0.18; c.globalCompositeOperation = 'screen';
+    c.filter = `blur(${Math.max(4, u * 0.02)}px)`;          // gentle glow
+    c.drawImage(src, 0, 0, w, h);
+    c.filter = 'none'; c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+    c.fillStyle = 'rgba(255,214,186,0.06)'; c.fillRect(0, 0, w, h);   // warm, flattering tint
+  } else if (id === 'bw') {
+    c.filter = 'grayscale(1) contrast(1.22) brightness(1.04)';
+    c.drawImage(src, 0, 0, w, h);
+    c.filter = 'none';
+  } else if (id === 'vintage') {
+    c.filter = 'sepia(0.45) saturate(0.85) contrast(0.9) brightness(1.06)';
+    c.drawImage(src, 0, 0, w, h);
+    c.filter = 'none';
+    c.globalCompositeOperation = 'lighten';                 // faded, milky blacks
+    c.fillStyle = 'rgb(46,36,26)'; c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'source-over';
+    c.fillStyle = 'rgba(255,190,120,0.07)'; c.fillRect(0, 0, w, h);
+    const v = c.createRadialGradient(w / 2, h / 2, u * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.6);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(40,25,10,0.45)');
+    c.fillStyle = v; c.fillRect(0, 0, w, h);               // soft vignette
+  } else {
+    c.drawImage(src, 0, 0, w, h);
+  }
+  return out;
+}
+const baseImage = () => aiCanvas || raw;          // the AI-themed photo, or the original
+function filtered(id) {
+  if (!filterCache.has(id)) filterCache.set(id, applyFilter(baseImage(), id, raw.width, raw.height));
+  return filterCache.get(id);
+}
+/* ---------- Compose the final picture ---------- */
+function render() {
+  const w = photo.width, h = photo.height;
+  if (!w) return;
+  composeInto(pctx, w, h);
+}
+function composeInto(ctx, w, h) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(glam ? filtered('glam') : baseImage(), 0, 0, w, h);
+  drawPartyText(ctx, w, h);
+  drawWatermark(ctx, w, h);
+}
+
+function drawWatermark(ctx, w, h) {
+  if (!CONFIG.watermark) return;
+  const u = Math.min(w, h), barH = Math.round(u * 0.13);
+  // soft dark fade so the name reads on any photo
+  const g = ctx.createLinearGradient(0, h - barH * 1.7, 0, h);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.7)');
+  ctx.fillStyle = g; ctx.fillRect(0, h - barH * 1.7, w, barH * 1.7);
+
+  const size = Math.round(barH * 0.66), cy = h - barH * 0.56;
+  ctx.save();
+  ctx.font = `italic 400 ${size}px "Booth Serif", Georgia, serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const tw = ctx.measureText(CONFIG.watermark).width;
+  const og = ctx.createLinearGradient(0, cy - size / 2, 0, cy + size / 2);
+  og.addColorStop(0, '#c3d27a'); og.addColorStop(.55, '#97a845'); og.addColorStop(1, '#6f7f2a');
+  ctx.shadowColor = 'rgba(0,0,0,.65)'; ctx.shadowBlur = size * .14; ctx.shadowOffsetY = size * .03;
+  ctx.fillStyle = og; ctx.fillText(CONFIG.watermark, w / 2, cy);
+  ctx.shadowColor = 'transparent';
+  // olive sprigs either side of the name
+  const gap = size * .35, sl = size * .95;
+  oliveSprig(ctx, w / 2 - tw / 2 - gap, cy + size * .06, sl, -1);
+  oliveSprig(ctx, w / 2 + tw / 2 + gap, cy + size * .06, sl, 1);
+  // small date, bottom right
+  ctx.fillStyle = 'rgba(244,239,220,.75)';
+  ctx.font = `400 ${Math.round(u * 0.022)}px system-ui, sans-serif`;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+  ctx.fillText(new Date().toLocaleDateString('en-GB'), w - u * 0.03, h - u * 0.022);
+  ctx.restore();
+}
+
+// A little olive branch: a curved stem with leaves and one olive, pointing away from the text
+function oliveSprig(ctx, x, y, len, dir) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(dir, 1);
+  ctx.strokeStyle = '#8a9a3b'; ctx.lineWidth = Math.max(1, len * .035); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(len * .5, -len * .12, len, -len * .02); ctx.stroke();
+  const leaf = (t, side, sz) => {
+    const px = len * t, py = -len * .12 * 4 * t * (1 - t) - len * .02 * t;
+    ctx.save(); ctx.translate(px, py); ctx.rotate(side * .55 - .1);
+    const lg = ctx.createLinearGradient(0, -sz * .3, sz, sz * .3);
+    lg.addColorStop(0, '#b5c568'); lg.addColorStop(1, '#6f7f2a');
+    ctx.fillStyle = lg; ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.quadraticCurveTo(sz * .5, -sz * .32, sz, 0); ctx.quadraticCurveTo(sz * .5, sz * .32, 0, 0);
+    ctx.fill(); ctx.restore();
+  };
+  leaf(.2, -1, len * .34); leaf(.38, 1, len * .34); leaf(.58, -1, len * .32); leaf(.76, 1, len * .3); leaf(.95, -.2, len * .28);
+  ctx.fillStyle = '#4f5d1c'; ctx.beginPath(); ctx.ellipse(len * .5, len * .1, len * .07, len * .055, .3, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+/* ---------- Host's photo title (on every photo during a party) ---------- */
+function drawPartyText(ctx, w, h) {
+  const text = (host ? host.name : '').trim();
+  if (!text) return;
+  const u = Math.min(w, h), fontFor = s => `700 ${s}px "Dancing Script", cursive, serif`;
+  let s = u * .15; ctx.font = fontFor(s);
+  while (ctx.measureText(text).width > w * .82 && s > u * .04) { s *= .92; ctx.font = fontFor(s); }
+  const x = w / 2, y = h * (h > w ? .08 : .14);
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const g = ctx.createLinearGradient(0, y - s / 2, 0, y + s / 2);
+  g.addColorStop(0, '#fff3c4'); g.addColorStop(.5, '#e0b85a'); g.addColorStop(1, '#a5822f');
+  ctx.shadowColor = 'rgba(0,0,0,.7)'; ctx.shadowBlur = s * .15; ctx.shadowOffsetY = s * .04;
+  ctx.fillStyle = g; ctx.fillText(text, x, y);
+  ctx.shadowColor = 'transparent'; ctx.strokeStyle = 'rgba(90,66,16,.8)'; ctx.lineWidth = s * .02; ctx.strokeText(text, x, y);
+  ctx.restore();
+}
+
+/* ---------- Edit screen: Retake / Glam it / Accept, then "Take it home" ---------- */
+function setEditMode(mode) {          // 'choose' | 'saving' | 'home'
+  $('editBar').hidden = mode !== 'choose';
+  $('savingBar').hidden = mode !== 'saving';
+  $('takeHome').hidden = mode !== 'home';
+}
+function refreshGlam() {
+  $('glamBtn').classList.toggle('on', glam);
+  $('glamBtn').textContent = glam ? '✨ Glam on' : '✨ Glam it';
+}
+$('glamBtn').onclick = () => { glam = !glam; refreshGlam(); render(); };
+
+/* ---------- AI theme it ---------- */
+const AI_THEMES = [   // icons for the tablet – the actual AI instructions live in the Supabase function
+  { id: 'riviera',    label: 'Italian Riviera',   emoji: '🍋', colors: ['#f6c945', '#2a8fbd'] },
+  { id: 'gatsby',     label: '1920s Gatsby',      emoji: '🥂', colors: ['#1d1d1d', '#c9a24a'] },
+  { id: 'hollywood',  label: 'Hollywood',         emoji: '🎬', colors: ['#9b111e', '#2b0a0f'] },
+  { id: 'tropical',   label: 'Tropical Beach',    emoji: '🌴', colors: ['#1fb5a8', '#f7a541'] },
+  { id: 'christmas',  label: 'Christmas',         emoji: '🎄', colors: ['#b3202a', '#1d6b3a'] },
+  { id: 'winter',     label: 'Winter Wonderland', emoji: '❄️', colors: ['#9fd3f2', '#3b5f9e'] },
+  { id: 'space',      label: 'Space Explorers',   emoji: '🚀', colors: ['#120a3a', '#5a2a9c'] },
+  { id: 'wildwest',   label: 'Wild West',         emoji: '🤠', colors: ['#c06a2b', '#5a3216'] },
+  { id: 'royal',      label: 'Royal Ball',        emoji: '👑', colors: ['#5b2a86', '#d4af37'] },
+  { id: 'disco',      label: '70s Disco',         emoji: '🪩', colors: ['#e0389b', '#f2a33a'] },
+  { id: 'underwater', label: 'Under the Sea',     emoji: '🐠', colors: ['#0b6fa4', '#22c3c3'] },
+  { id: 'superhero',  label: 'Superheroes',       emoji: '🦸', colors: ['#d62828', '#1d3fbf'] }
+];
+const MODE_TEXT = { full: 'Pick a theme for the whole picture', background: 'Pick a new background', clothing: 'Pick new outfits' };
+const aiEnabled = () => CONFIG.demo || !/YOUR-PROJECT/.test(CONFIG.aiEndpoint || 'YOUR-PROJECT');
+
+function openAi() {
+  $('aiModes').hidden = false; $('aiThemes').hidden = true; $('aiBusy').hidden = true;
+  $('aiSub').textContent = 'How would you like to theme your photo?';
+  $('aiOriginal').hidden = !aiCanvas;
+  show('ai');
+}
+document.querySelectorAll('.modeBtn').forEach(b => b.onclick = () => {
+  aiMode = b.dataset.mode;
+  $('aiSub').textContent = MODE_TEXT[aiMode];
+  const grid = $('aiThemes'); grid.innerHTML = '';
+  AI_THEMES.forEach(t => {
+    const tile = document.createElement('button');
+    tile.className = 'themeTile';
+    tile.style.background = `linear-gradient(145deg, ${t.colors[0]}, ${t.colors[1]})`;
+    tile.innerHTML = `<span class="te">${t.emoji}</span><span class="tl">${t.label}</span>`;
+    tile.onclick = () => runAi(t);
+    grid.appendChild(tile);
+  });
+  $('aiModes').hidden = true; $('aiThemes').hidden = false;
+});
+$('aiBack').onclick = () => {
+  if (!$('aiThemes').hidden) { $('aiThemes').hidden = true; $('aiModes').hidden = false; $('aiSub').textContent = 'How would you like to theme your photo?'; }
+  else backToPhoto();
+};
+$('aiOriginal').onclick = () => { aiCanvas = null; aiThemeLabel = ''; filterCache.clear(); backToPhoto(); };
+function backToPhoto() { refreshAiBtn(); setEditMode('choose'); show('edit'); render(); }
+function refreshAiBtn() {
+  $('aiBtn').hidden = !aiEnabled();
+  $('editBar').style.gridTemplateColumns = aiEnabled() ? '' : 'repeat(3, 1fr)';
+  $('aiBtn').classList.toggle('on', !!aiCanvas);
+  $('aiBtn').textContent = aiCanvas ? `🪄 ${aiThemeLabel}` : '🪄 AI theme it';
+}
+
+async function runAi(theme) {
+  $('aiBusyTitle').textContent = `Creating your ${theme.label} photo…`;
+  $('aiBusy').hidden = false; aiWorking = true; clearTimeout(idleTimer);
+  const bar = $('aiBar'); bar.style.transition = 'none'; bar.style.width = '0';
+  requestAnimationFrame(() => { bar.style.transition = 'width 25s cubic-bezier(.2,.6,.3,1)'; bar.style.width = '92%'; });
+  try {
+    const img = await requestAiImage(theme);
+    // Fit the AI picture to the photo's exact size
+    const c = document.createElement('canvas'); c.width = raw.width; c.height = raw.height;
+    const k = Math.max(c.width / img.width, c.height / img.height), dw = img.width * k, dh = img.height * k;
+    c.getContext('2d').drawImage(img, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
+    aiCanvas = c; aiThemeLabel = theme.label; filterCache.clear();
+    bar.style.transition = 'width .3s'; bar.style.width = '100%';
+    await sleep(300);
+    aiWorking = false; $('aiBusy').hidden = true;
+    backToPhoto();
+  } catch (e) {
+    console.error(e);
+    aiWorking = false; $('aiBusy').hidden = true; resetIdle();
+    $('aiSub').textContent = e.userMessage || "Sorry – the AI couldn't do that one. Try another theme, or go back to your photo.";
+  }
+}
+async function requestAiImage(theme) {
+  // Send the plain photo (no title or Serendipity strip – those are added afterwards)
+  const long = 1536, s = Math.min(1, long / Math.max(raw.width, raw.height));
+  const c = document.createElement('canvas'); c.width = Math.round(raw.width * s); c.height = Math.round(raw.height * s);
+  c.getContext('2d').drawImage(raw, 0, 0, c.width, c.height);
+  if (CONFIG.demo) {   // demo mode: pretend, so the flow can be tried without the AI
+    await sleep(2500);
+    const d = document.createElement('canvas'); d.width = c.width; d.height = c.height;
+    const x = d.getContext('2d'); x.filter = 'hue-rotate(160deg) saturate(1.4)'; x.drawImage(c, 0, 0); x.filter = 'none';
+    x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(0, d.height * .45, d.width, d.height * .1);
+    x.fillStyle = "#fff"; x.font = `700 ${d.width * .042}px system-ui`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(`DEMO: ${theme.label} (${aiMode})`, d.width / 2, d.height / 2);
+    return d;
+  }
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 120000);
+  try {
+    const res = await fetch(CONFIG.aiEndpoint, {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', 'X-Booth-Key': CONFIG.boothKey },
+      body: JSON.stringify({ image: c.toDataURL('image/jpeg', 0.88).split(',')[1], theme: theme.id, mode: aiMode,
+                             aspect: raw.height > raw.width ? '9:16' : '16:9' })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw Object.assign(new Error(data.error || 'HTTP ' + res.status), { userMessage: data.message });
+    const img = new Image();
+    await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = `data:${data.mime || 'image/png'};base64,${data.image}`; });
+    return img;
+  } catch (e) {
+    if (e.name === 'AbortError') e.userMessage = 'The AI is taking too long – please try again.';
+    throw e;
+  } finally { clearTimeout(timer); }
+}
+$('aiBtn').onclick = openAi;
+
+/* ---------- Take photo flow ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function takePhoto() {
+  if (busy) return; busy = true;
+  try {
+    show('camera');
+    $('camHint').textContent = 'Get ready…';
+    await startCamera();
+    await sleep(900);
+    $('camHint').textContent = 'Look at the camera!';
+    const cd = $('countdown');
+    for (let n = CONFIG.countdown; n > 0; n--) {
+      cd.textContent = n; cd.classList.remove('tick'); void cd.offsetWidth; cd.classList.add('tick');
+      beep(n === 1 ? 880 : 660);
+      await sleep(1000);
+    }
+    cd.textContent = ''; $('camHint').textContent = '';
+    captureFrame();
+    const f = $('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+    glam = false; refreshGlam(); refreshAiBtn(); setEditMode('choose');
+    show('edit');
+    render();
+  } catch (e) {
+    console.error(e);
+    showError("The camera isn't available right now. Please try again.");
+  } finally { busy = false; }
+}
+
+let audioCtx;
+function beep(freq) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+    o.start(); o.stop(audioCtx.currentTime + 0.25);
+  } catch {}
+}
+
+/* ---------- Upload & show QR codes ---------- */
+function makeThumb() {
+  const t = document.createElement('canvas'), w = 360;
+  t.width = w; t.height = Math.round(photo.height * w / photo.width);
+  t.getContext('2d').drawImage(photo, 0, 0, t.width, t.height);
+  return t.toDataURL('image/jpeg', 0.75);
+}
+async function uploadPhoto() {
+  setEditMode('saving'); $('savingText').textContent = 'Saving your photo…';
+  try {
+    let id, expires;
+    if (CONFIG.demo) { await sleep(800); id = 'DEMO' + newId(10); expires = new Date(Date.now() + CONFIG.keepDays * 864e5).toISOString(); }
+    else {
+      const res = await fetch(CONFIG.uploadEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Booth-Key': CONFIG.boothKey },
+        body: JSON.stringify({ image: finalDataUrl.split(',')[1], thumb: thumbDataUrl.split(',')[1],
+                               party: host ? { id: host.id, name: host.name } : undefined, inGallery: true })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      ({ id, expires } = data);
+    }
+    showTakeHome(id, expires);
+  } catch (e) {
+    console.error(e);
+    showError("We couldn't save your photo just now – please check the Wi-Fi and try again.");
+  }
+}
+function showTakeHome(id, expires) {
+  const until = new Date(expires).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  drawQR($('qrPhoto'), pageUrl('p.html', 'i', id));
+  $('thNote').textContent = `Point your phone camera at the code · online until ${until}`;
+  setEditMode('home');
+  clearTimeout(homeTimer);
+  homeTimer = setTimeout(() => { if ($('edit').classList.contains('active') && !$('takeHome').hidden) resetAll(); }, CONFIG.takeHomeSeconds * 1000);
+}
+function showError(msg) { $('errorMsg').textContent = msg; show('error'); }
+
+function resetAll() {
+  finalDataUrl = thumbDataUrl = null; clearTimeout(homeTimer);
+  stopCamera(); refreshAttract(); show('attract');
+}
+
+/* ---------- Wake lock / full screen ---------- */
+async function keepAwake() { try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+function goFullscreen() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(() => {});
+}
+
+/* ---------- Setup screen (tap top-left corner 5 times) ---------- */
+let taps = 0, tapTimer;
+$('staffHotspot').addEventListener('pointerdown', () => {
+  taps++; clearTimeout(tapTimer); tapTimer = setTimeout(() => taps = 0, 1500);
+  if (taps >= 5) { taps = 0; askStaffPin(); }
+});
+
+/* Staff PIN: created on first use, stored on this tablet as a hash (never in the code). */
+const PIN_KEY = 'booth.staffPin', LOCK_KEY = 'booth.pinLock', MAX_TRIES = 5, LOCK_MINUTES = 5;
+let pinMode = 'enter', pinTries = 0;   // modes: 'enter' | 'create'
+async function hashPin(pin) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('serendipity-booth:' + pin));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function lockedFor() { return Math.max(0, (parseInt(safeGet(LOCK_KEY)) || 0) - Date.now()); }
+function askStaffPin(mode) {
+  pinMode = mode || (safeGet(PIN_KEY) ? 'enter' : 'create');
+  const creating = pinMode === 'create';
+  $('pinTitle').textContent = creating ? 'Create a staff PIN' : 'Staff PIN';
+  $('pinHelp').textContent = creating ? 'Choose a 4–8 digit PIN. You will need it every time you open setup.' : 'Enter the staff PIN to open setup';
+  $('pinInput').value = ''; $('pinConfirm').value = ''; $('pinConfirm').hidden = !creating; $('pinMsg').textContent = '';
+  const wait = lockedFor();
+  if (!creating && wait) $('pinMsg').textContent = `Too many wrong tries – try again in ${Math.ceil(wait / 60000)} min.`;
+  show('staffPin');
+  setTimeout(() => $('pinInput').focus(), 150);
+}
+async function submitPin() {
+  const pin = $('pinInput').value.trim(), msg = $('pinMsg');
+  if (pinMode === 'create') {
+    if (!/^\d{4,8}$/.test(pin)) return msg.textContent = 'Use 4 to 8 digits.';
+    if (pin !== $('pinConfirm').value.trim()) return msg.textContent = "The two PINs don't match.";
+    safeSet(PIN_KEY, await hashPin(pin)); pinTries = 0;
+    return openSettings();
+  }
+  const wait = lockedFor();
+  if (wait) return msg.textContent = `Too many wrong tries – try again in ${Math.ceil(wait / 60000)} min.`;
+  if (await hashPin(pin) === safeGet(PIN_KEY)) { pinTries = 0; return openSettings(); }
+  pinTries++; $('pinInput').value = '';
+  if (pinTries >= MAX_TRIES) {
+    safeSet(LOCK_KEY, String(Date.now() + LOCK_MINUTES * 60000)); pinTries = 0;
+    msg.textContent = `Too many wrong tries – locked for ${LOCK_MINUTES} minutes.`;
+  } else msg.textContent = `Wrong PIN (${MAX_TRIES - pinTries} ${MAX_TRIES - pinTries === 1 ? 'try' : 'tries'} left).`;
+}
+$('pinGo').onclick = submitPin;
+['pinInput', 'pinConfirm'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') submitPin(); }));
+$('pinCancel').onclick = () => resetAll();
+$('changePin').onclick = () => askStaffPin('create');
+$('closeSettings').onclick = () => { stopCamera(); resetAll(); };
+async function openSettings() {
+  try { await startCamera(); } catch {}
+  const devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+  const sel = $('camSelect'); sel.innerHTML = '<option value="">Front camera (default)</option>';
+  devices.forEach((d, i) => {
+    const o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || ('Camera ' + (i + 1));
+    if (d.deviceId === CONFIG.deviceId) o.selected = true; sel.appendChild(o);
+  });
+  $('cdInput').value = CONFIG.countdown;
+  $('mirrorInput').checked = !!CONFIG.mirror;
+  $('demoInput').checked = !!CONFIG.demo;
+  show('settings');
+}
+$('saveSettings').onclick = () => {
+  const s = { deviceId: $('camSelect').value || undefined,
+              countdown: Math.max(1, Math.min(10, parseInt($('cdInput').value) || 5)),
+              mirror: $('mirrorInput').checked, demo: $('demoInput').checked };
+  Object.assign(CONFIG, s); if (!s.deviceId) delete CONFIG.deviceId;
+  safeSet('booth.settings.v2', JSON.stringify(s));
+  stopCamera(); resetAll();
+};
+$('fsBtn').onclick = goFullscreen;
+
+/* ---------- Buttons ---------- */
+function start() { goFullscreen(); keepAwake(); beep(1); takePhoto(); }
+$('attract').addEventListener('click', e => { if (!e.target.closest('#hostBtn')) start(); });   // touch anywhere to start
+$('retakeBtn').onclick = takePhoto;
+$('acceptBtn').onclick = () => {
+  render();
+  finalDataUrl = photo.toDataURL('image/jpeg', CONFIG.jpegQuality);
+  thumbDataUrl = makeThumb();
+  stopCamera();
+  uploadPhoto();
+};
+$('doneBtn').onclick = resetAll;
+$('errHomeBtn').onclick = resetAll;
+$('errRetryBtn').onclick = () => { if (!finalDataUrl) return resetAll(); show('edit'); uploadPhoto(); };
+refreshAttract();
+document.fonts && document.fonts.load('italic 40px "Booth Serif"').catch(() => {});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
