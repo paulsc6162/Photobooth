@@ -68,7 +68,7 @@ Go to Site configuration → Environment variables:
 ```
 BOOTH_KEY              any long random text – paste the same text into CONFIG.boothKey in index.html
 SUPABASE_URL           https://xxxx.supabase.co
-SUPABASE_SERVICE_KEY   service_role key
+SUPABASE_SERVICE_KEY   your Supabase secret key (sb_secret_…) – Project Settings → API Keys
 SUPABASE_BUCKET        photobooth
 KEEP_DAYS              7    (optional – change keepDays in index.html to match)
 ```
@@ -83,6 +83,7 @@ Redeploy after adding them.
    GEMINI_API_KEY   your Gemini key
    BOOTH_KEY        the same text as in Netlify and CONFIG.boothKey
    AI_DAILY_LIMIT   300   (optional – maximum AI photos per day, to cap costs)
+   DB_SECRET_KEY    your Supabase secret key (sb_secret_…)
    AI_IMAGE_SIZE    1K    (optional – 2K is sharper but costs more)
    ```
 5. **Connect the tablet.** Copy the function's URL (it looks like `https://xxxx.supabase.co/functions/v1/ai-theme`) into **`aiEndpoint`** in the CONFIG block of `index.html`. The 🪄 button only appears once this is set.

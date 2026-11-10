@@ -5,7 +5,11 @@ export const KEEP_DAYS = parseInt(env.KEEP_DAYS || '7', 10);
 export const json = (status, body, extra = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...extra } });
 
-const sb = () => ({ apikey: env.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}` });
+// New Supabase secret keys (sb_secret_…) go in the apikey header only; legacy service_role JWTs also need Authorization.
+const sb = () => {
+  const k = env.SUPABASE_SERVICE_KEY || '';
+  return k.startsWith('sb_') ? { apikey: k } : { apikey: k, Authorization: `Bearer ${k}` };
+};
 export const publicUrl = path => `${env.SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
 
 export async function upload(path, bytes) {

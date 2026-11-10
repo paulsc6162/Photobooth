@@ -8,7 +8,8 @@
 //   AI_DAILY_LIMIT   – optional, max AI edits per day (default 300) to cap costs
 //   GEMINI_MODEL     – optional, default gemini-3.1-flash-image
 //   AI_IMAGE_SIZE    – optional, "1K" (default, ~5p per photo) or "2K" (sharper, ~8p)
-// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided automatically by Supabase.
+//   DB_SECRET_KEY    – your Supabase secret key (sb_secret_…), used for the daily-limit log
+// SUPABASE_URL is provided automatically by Supabase.
 //
 // The prompts live here (not on the tablet), so the booth can only ask for these approved themes.
 
@@ -46,9 +47,12 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
 const env = (k: string, d = '') => Deno.env.get(k) ?? d;
-const sbHeaders = () => ({
-  apikey: env('SUPABASE_SERVICE_ROLE_KEY'), Authorization: `Bearer ${env('SUPABASE_SERVICE_ROLE_KEY')}`, 'Content-Type': 'application/json'
-});
+// Uses your secret key (DB_SECRET_KEY, sb_secret_…) if you add one, otherwise Supabase's built-in service key.
+const sbHeaders = (): Record<string, string> => {
+  const k = env('DB_SECRET_KEY') || env('SUPABASE_SERVICE_ROLE_KEY');
+  return k.startsWith('sb_') ? { apikey: k, 'Content-Type': 'application/json' }
+                             : { apikey: k, Authorization: `Bearer ${k}`, 'Content-Type': 'application/json' };
+};
 async function log(theme: string, mode: string, ok: boolean, detail = '') {
   try {
     await fetch(`${env('SUPABASE_URL')}/rest/v1/booth_ai_log`, {
