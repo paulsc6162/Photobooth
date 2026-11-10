@@ -40,7 +40,8 @@ export default async (req) => {
     return json(200, { ok: true, id, expires });
   } catch (e) {
     console.error('Upload failed', e);
-    return json(502, { ok: false, error: 'Upload failed' });
+    // Short technical detail so the problem can be diagnosed from the booth's error screen
+    return json(502, { ok: false, error: 'Upload failed', detail: String(e && e.message || e).slice(0, 220) });
   }
 };
 

@@ -304,6 +304,7 @@
 <section id="error" class="screen">
   <h1>Hmm, that didn't work</h1>
   <p id="errorMsg"></p>
+  <p id="errorDetail" style="font-size:.85rem;color:#777;max-width:40em;word-break:break-word"></p>
   <div class="row" style="margin-top:1.5em">
     <button class="btn secondary" id="errHomeBtn">Start over</button>
     <button class="btn" id="errRetryBtn">Try again</button>
@@ -843,20 +844,22 @@ async function uploadPhoto() {
     let id, expires;
     if (CONFIG.demo) { await sleep(800); id = 'DEMO' + newId(10); expires = new Date(Date.now() + CONFIG.keepDays * 864e5).toISOString(); }
     else {
+      const ctrl = new AbortController(); setTimeout(() => ctrl.abort(), 40000);
       const res = await fetch(CONFIG.uploadEndpoint, {
-        method: 'POST',
+        method: 'POST', signal: ctrl.signal,
         headers: { 'Content-Type': 'application/json', 'X-Booth-Key': CONFIG.boothKey },
         body: JSON.stringify({ image: finalDataUrl.split(',')[1], thumb: thumbDataUrl.split(',')[1],
                                party: host ? { id: host.id, name: host.name } : undefined, inGallery: true })
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      if (!res.ok || !data.ok) throw new Error(`${res.status} ${data.error || res.statusText || ''} ${data.detail || ''}`.trim());
       ({ id, expires } = data);
     }
     showTakeHome(id, expires);
   } catch (e) {
     console.error(e);
-    showError("We couldn't save your photo just now – please check the Wi-Fi and try again.");
+    showError("We couldn't save your photo just now – please check the Wi-Fi and try again.",
+              e.name === 'AbortError' ? 'Timed out after 40 seconds' : String(e.message || e));
   }
 }
 function showTakeHome(id, expires) {
@@ -867,7 +870,11 @@ function showTakeHome(id, expires) {
   clearTimeout(homeTimer);
   homeTimer = setTimeout(() => { if ($('edit').classList.contains('active') && !$('takeHome').hidden) resetAll(); }, CONFIG.takeHomeSeconds * 1000);
 }
-function showError(msg) { $('errorMsg').textContent = msg; show('error'); }
+function showError(msg, detail) {
+  $('errorMsg').textContent = msg;
+  $('errorDetail').textContent = detail ? `Details for staff: ${detail}` : '';
+  show('error');
+}
 
 function resetAll() {
   finalDataUrl = thumbDataUrl = null; clearTimeout(homeTimer);
