@@ -104,14 +104,20 @@
   .modeBtn .mi { font-size: clamp(2.4rem, 7vw, 3.4rem); }
   .modeBtn b { display: block; font-size: clamp(1.3rem, 3.8vw, 2rem); }
   .modeBtn small { display: block; color: #bbb; font-size: clamp(.95rem, 2.6vw, 1.3rem); margin-top: .2em; }
-  .themeGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1em; width: 100%; }
+  .themeGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8em; width: 100%; }
+  .themeGrid.roles { grid-template-columns: repeat(3, 1fr); gap: 1em; }
   .themeGrid[hidden], .aiModes[hidden] { display: none; }
+  .themeTile { position: relative; }
+  .themeTile.sel { box-shadow: 0 0 0 5px #f4d27a, 0 6px 18px rgba(0,0,0,.4); }
+  .themeTile.sel::after { content: '✓'; position: absolute; top: .3em; right: .45em; font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 900;
+                          color: #1a1a1a; background: #f4d27a; border-radius: 50%; width: 1.4em; height: 1.4em; display: grid; place-items: center; text-shadow: none; }
+  #aiNext:disabled { opacity: .4; }
   .themeTile { border: 0; border-radius: 20px; aspect-ratio: 1 / 1.05; color: #fff; display: flex; flex-direction: column;
                align-items: center; justify-content: center; gap: .25em; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.4);
                text-shadow: 0 2px 6px rgba(0,0,0,.45); }
   .themeTile:active { transform: scale(.96); }
-  .themeTile .te { font-size: clamp(2.6rem, 9vw, 4.4rem); line-height: 1; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
-  .themeTile .tl { font-weight: 800; font-size: clamp(1rem, 2.9vw, 1.4rem); padding: 0 .4em; text-align: center; }
+  .themeTile .te { font-size: clamp(2.2rem, 7vw, 3.6rem); line-height: 1; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
+  .themeTile .tl { font-weight: 800; font-size: clamp(.85rem, 2.4vw, 1.2rem); padding: 0 .4em; text-align: center; }
   .aiNote { color: #aaa; font-size: clamp(.9rem, 2.4vw, 1.15rem); margin: 1.6em 0 1em; text-align: center; }
   #aiBusy { position: absolute; inset: 0; background: rgba(10,8,16,.94); display: flex; flex-direction: column; align-items: center;
             justify-content: center; text-align: center; padding: 0 8vw; z-index: 10; }
@@ -280,6 +286,7 @@
       <button class="modeBtn" data-mode="full"><span class="mi">🎭</span><span><b>Theme the entire picture</b><small>New outfits and a new background</small></span></button>
       <button class="modeBtn" data-mode="background"><span class="mi">🏞️</span><span><b>Theme the background</b><small>Keep your outfits, change the scene</small></span></button>
       <button class="modeBtn" data-mode="clothing"><span class="mi">👗</span><span><b>Theme the clothing</b><small>Keep the background, change the outfits</small></span></button>
+      <button class="modeBtn" data-mode="star"><span class="mi">⭐</span><span><b>Be the star</b><small>Pick your star look, then where you are</small></span></button>
     </div>
 
     <div class="themeGrid" id="aiThemes" hidden></div>
@@ -288,6 +295,7 @@
     <div class="row">
       <button class="btn secondary" id="aiBack">← Back</button>
       <button class="btn secondary" id="aiOriginal" hidden>↺ Use my original photo</button>
+      <button class="btn primary" id="aiNext" hidden>Next →</button>
     </div>
   </div>
 
@@ -642,44 +650,89 @@ function setEditMode(mode) {          // 'choose' | 'saving' | 'home'
 
 /* ---------- AI theme it ---------- */
 const AI_THEMES = [   // icons for the tablet – the actual AI instructions live in the Supabase function
-  { id: 'riviera',    label: 'Italian Riviera',   emoji: '🍋', colors: ['#f6c945', '#2a8fbd'] },
-  { id: 'gatsby',     label: '1920s Gatsby',      emoji: '🥂', colors: ['#1d1d1d', '#c9a24a'] },
-  { id: 'hollywood',  label: 'Hollywood',         emoji: '🎬', colors: ['#9b111e', '#2b0a0f'] },
-  { id: 'tropical',   label: 'Tropical Beach',    emoji: '🌴', colors: ['#1fb5a8', '#f7a541'] },
-  { id: 'christmas',  label: 'Christmas',         emoji: '🎄', colors: ['#b3202a', '#1d6b3a'] },
-  { id: 'winter',     label: 'Winter Wonderland', emoji: '❄️', colors: ['#9fd3f2', '#3b5f9e'] },
-  { id: 'space',      label: 'Space Explorers',   emoji: '🚀', colors: ['#120a3a', '#5a2a9c'] },
-  { id: 'wildwest',   label: 'Wild West',         emoji: '🤠', colors: ['#c06a2b', '#5a3216'] },
-  { id: 'royal',      label: 'Royal Ball',        emoji: '👑', colors: ['#5b2a86', '#d4af37'] },
-  { id: 'disco',      label: '70s Disco',         emoji: '🪩', colors: ['#e0389b', '#f2a33a'] },
-  { id: 'underwater', label: 'Under the Sea',     emoji: '🐠', colors: ['#0b6fa4', '#22c3c3'] },
-  { id: 'superhero',  label: 'Superheroes',       emoji: '🦸', colors: ['#d62828', '#1d3fbf'] }
+  { id: 'hollywood',  label: 'Red Carpet',          emoji: '📸', colors: ['#9b111e', '#2b0a0f'] },
+  { id: 'vip',        label: 'VIP Party',           emoji: '🍾', colors: ['#1a1a2e', '#d4af37'] },
+  { id: 'gatsby',     label: 'Great Gatsby Bar',    emoji: '🍸', colors: ['#1d1d1d', '#c9a24a'] },
+  { id: 'casino',     label: 'Casino Night',        emoji: '🎰', colors: ['#0f5132', '#b8001f'] },
+  { id: 'movieset',   label: 'Movie Set',           emoji: '🎥', colors: ['#2b2b2b', '#e0b03a'] },
+  { id: 'fashion',    label: 'Fashion Show',        emoji: '👠', colors: ['#111111', '#e0388b'] },
+  { id: 'riviera',    label: 'Italian Riviera',     emoji: '🍋', colors: ['#f6c945', '#2a8fbd'] },
+  { id: 'venetian',   label: 'Venetian Masquerade', emoji: '🎭', colors: ['#7a1f3d', '#d4a64a'] },
+  { id: 'rome',       label: 'Ancient Rome',        emoji: '🏛️', colors: ['#c9a46a', '#8b2e1f'] },
+  { id: 'regency',    label: 'Regency Ball',        emoji: '💐', colors: ['#d98aa8', '#5f7fb8'] },
+  { id: 'royal',      label: 'Royal Ball',          emoji: '👑', colors: ['#5b2a86', '#d4af37'] },
+  { id: 'wedding',    label: 'Wedding',             emoji: '💍', colors: ['#c9a0a8', '#8a6f8f'] },
+  { id: 'nyc',        label: 'New York Street',     emoji: '🚕', colors: ['#e0b000', '#2b2b2b'] },
+  { id: 'whitehouse', label: 'The White House',     emoji: '🇺🇸', colors: ['#1d3f8f', '#b22234'] },
+  { id: 'coffee',     label: 'Trendy Coffee Shop',  emoji: '☕', colors: ['#6f4e37', '#c79a6b'] },
+  { id: 'tropical',   label: 'Tropical Beach',      emoji: '🌴', colors: ['#1fb5a8', '#f7a541'] },
+  { id: 'pirates',    label: 'Pirates',             emoji: '🏴‍☠️', colors: ['#2b2b2b', '#8a5a2b'] },
+  { id: 'wildwest',   label: 'Wild West',           emoji: '🤠', colors: ['#c06a2b', '#5a3216'] },
+  { id: 'disco',      label: '70s Disco',           emoji: '🪩', colors: ['#e0389b', '#f2a33a'] },
+  { id: 'christmas',  label: 'Christmas',           emoji: '🎄', colors: ['#b3202a', '#1d6b3a'] },
+  { id: 'winter',     label: 'Winter Wonderland',   emoji: '❄️', colors: ['#9fd3f2', '#3b5f9e'] },
+  { id: 'space',      label: 'Space Explorers',     emoji: '🚀', colors: ['#120a3a', '#5a2a9c'] },
+  { id: 'underwater', label: 'Under the Sea',       emoji: '🐠', colors: ['#0b6fa4', '#22c3c3'] },
+  { id: 'superhero',  label: 'Superheroes',         emoji: '🦸', colors: ['#d62828', '#1d3fbf'] }
 ];
-const MODE_TEXT = { full: 'Pick a theme for the whole picture', background: 'Pick a new background', clothing: 'Pick new outfits' };
+const STAR_ROLES = [
+  { id: 'moviestar',  label: 'Movie Star',      emoji: '🌟', colors: ['#9b111e', '#d4af37'] },
+  { id: 'rockstar',   label: 'Rock Star',       emoji: '🎸', colors: ['#1d1d1d', '#b8001f'] },
+  { id: 'popdiva',    label: 'Pop Diva',        emoji: '🎤', colors: ['#e0389b', '#8a2be2'] },
+  { id: 'royalty',    label: 'Royalty',         emoji: '👑', colors: ['#5b2a86', '#d4af37'] },
+  { id: 'sports',     label: 'Sports Champion', emoji: '🏆', colors: ['#0f5132', '#e0b000'] },
+  { id: 'supermodel', label: 'Supermodel',      emoji: '💃', colors: ['#111111', '#e0388b'] }
+];
+const MODE_TEXT = { full: 'Pick a theme for the whole picture', background: 'Pick a new background', clothing: 'Pick new outfits', star: 'Now pick where you are' };
 const aiEnabled = () => CONFIG.demo || !/YOUR-PROJECT/.test(CONFIG.aiEndpoint || 'YOUR-PROJECT');
+let aiStep = 'modes', starRoles = new Set();
 
+function tileFor(t) {
+  const tile = document.createElement('button');
+  tile.className = 'themeTile';
+  tile.style.background = `linear-gradient(145deg, ${t.colors[0]}, ${t.colors[1]})`;
+  tile.innerHTML = `<span class="te">${t.emoji}</span><span class="tl">${t.label}</span>`;
+  return tile;
+}
+function aiShowStep(step) {
+  aiStep = step;
+  const grid = $('aiThemes'); grid.innerHTML = ''; grid.classList.toggle('roles', step === 'roles');
+  $('aiModes').hidden = step !== 'modes'; grid.hidden = step === 'modes';
+  $('aiNext').hidden = step !== 'roles';
+  if (step === 'modes') { $('aiSub').textContent = 'How would you like to theme your photo?'; return; }
+  if (step === 'roles') {
+    $('aiSub').textContent = 'Who do you want to be? Pick as many as you like';
+    STAR_ROLES.forEach(r => {
+      const tile = tileFor(r);
+      tile.classList.toggle('sel', starRoles.has(r.id));
+      tile.onclick = () => {
+        starRoles.has(r.id) ? starRoles.delete(r.id) : starRoles.add(r.id);
+        tile.classList.toggle('sel', starRoles.has(r.id));
+        $('aiNext').disabled = !starRoles.size; resetIdle();
+      };
+      grid.appendChild(tile);
+    });
+    $('aiNext').disabled = !starRoles.size;
+    return;
+  }
+  $('aiSub').textContent = MODE_TEXT[aiMode];
+  AI_THEMES.forEach(t => { const tile = tileFor(t); tile.onclick = () => runAi(t); grid.appendChild(tile); });
+  $('ai').scrollTop = 0;
+}
 function openAi() {
-  $('aiModes').hidden = false; $('aiThemes').hidden = true; $('aiBusy').hidden = true;
-  $('aiSub').textContent = 'How would you like to theme your photo?';
+  $('aiBusy').hidden = true; starRoles = new Set();
+  aiShowStep('modes');
   $('aiOriginal').hidden = !aiCanvas;
   show('ai');
 }
 document.querySelectorAll('.modeBtn').forEach(b => b.onclick = () => {
   aiMode = b.dataset.mode;
-  $('aiSub').textContent = MODE_TEXT[aiMode];
-  const grid = $('aiThemes'); grid.innerHTML = '';
-  AI_THEMES.forEach(t => {
-    const tile = document.createElement('button');
-    tile.className = 'themeTile';
-    tile.style.background = `linear-gradient(145deg, ${t.colors[0]}, ${t.colors[1]})`;
-    tile.innerHTML = `<span class="te">${t.emoji}</span><span class="tl">${t.label}</span>`;
-    tile.onclick = () => runAi(t);
-    grid.appendChild(tile);
-  });
-  $('aiModes').hidden = true; $('aiThemes').hidden = false;
+  aiShowStep(aiMode === 'star' ? 'roles' : 'themes');
 });
+$('aiNext').onclick = () => { if (starRoles.size) aiShowStep('themes'); };
 $('aiBack').onclick = () => {
-  if (!$('aiThemes').hidden) { $('aiThemes').hidden = true; $('aiModes').hidden = false; $('aiSub').textContent = 'How would you like to theme your photo?'; }
+  if (aiStep === 'themes' && aiMode === 'star') aiShowStep('roles');
+  else if (aiStep !== 'modes') aiShowStep('modes');
   else backToPhoto();
 };
 $('aiOriginal').onclick = () => { aiCanvas = null; aiThemeLabel = ''; backToPhoto(); };
@@ -688,7 +741,7 @@ function refreshAiBtn() {
   $('aiBtn').hidden = !aiEnabled();
   $('editBar').style.gridTemplateColumns = aiEnabled() ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
   $('aiBtn').classList.toggle('on', !!aiCanvas);
-  $('aiBtn').textContent = aiCanvas ? `🪄 ${aiThemeLabel}` : '🪄 AI theme it';
+  $('aiBtn').textContent = aiCanvas ? (aiThemeLabel.startsWith('⭐') ? aiThemeLabel : `🪄 ${aiThemeLabel}`) : '🪄 AI theme it';
 }
 
 async function runAi(theme) {
@@ -702,7 +755,7 @@ async function runAi(theme) {
     const c = document.createElement('canvas'); c.width = raw.width; c.height = raw.height;
     const k = Math.max(c.width / img.width, c.height / img.height), dw = img.width * k, dh = img.height * k;
     c.getContext('2d').drawImage(img, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
-    aiCanvas = c; aiThemeLabel = theme.label;
+    aiCanvas = c; aiThemeLabel = aiMode === 'star' ? `⭐ ${theme.label}` : theme.label;
     bar.style.transition = 'width .3s'; bar.style.width = '100%';
     await sleep(300);
     aiWorking = false; $('aiBusy').hidden = true;
@@ -728,7 +781,7 @@ async function requestAiImage(theme) {
     const x = d.getContext('2d'); x.filter = 'hue-rotate(160deg) saturate(1.4)'; x.drawImage(c, 0, 0); x.filter = 'none';
     x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(0, d.height * .45, d.width, d.height * .1);
     x.fillStyle = "#fff"; x.font = `700 ${d.width * .042}px system-ui`; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillText(`DEMO: ${theme.label} (${aiMode})`, d.width / 2, d.height / 2);
+    x.fillText(`DEMO: ${theme.label} (${aiMode}${aiMode === 'star' ? ': ' + [...starRoles].join(', ') : ''})`, d.width / 2, d.height / 2);
     return d;
   }
   const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 120000);
@@ -737,6 +790,7 @@ async function requestAiImage(theme) {
       method: 'POST', signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', 'X-Booth-Key': CONFIG.boothKey },
       body: JSON.stringify({ image: c.toDataURL('image/jpeg', 0.88).split(',')[1], theme: theme.id, mode: aiMode,
+                             roles: aiMode === 'star' ? [...starRoles] : undefined,
                              aspect: nearestAspect(raw.width / raw.height) })
     });
     const data = await res.json().catch(() => ({}));
