@@ -8,8 +8,10 @@ import { json, db, upload, randomId, ID_RE, KEEP_DAYS } from '../lib/shared.mjs'
 
 export default async (req) => {
   if (req.method !== 'POST') return json(405, { ok: false, error: 'POST only' });
-  if (!process.env.BOOTH_KEY || req.headers.get('x-booth-key') !== process.env.BOOTH_KEY)
-    return json(401, { ok: false, error: 'Unauthorised' });
+  const boothKey = (process.env.BOOTH_KEY || '').trim();          // ignore stray spaces from copy-and-paste
+  if (!boothKey) return json(401, { ok: false, error: 'Unauthorised', detail: 'BOOTH_KEY is not set in Netlify' });
+  if ((req.headers.get('x-booth-key') || '').trim() !== boothKey)
+    return json(401, { ok: false, error: 'Unauthorised', detail: `booth key does not match Netlify BOOTH_KEY (Netlify's starts "${boothKey.slice(0, 6)}…", ${boothKey.length} characters)` });
 
   let body;
   try { body = await req.json(); } catch { return json(400, { ok: false, error: 'Bad JSON' }); }
