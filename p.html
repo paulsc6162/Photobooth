@@ -12,30 +12,35 @@
   :root { --olive: #8a9a3b; --olive-light: #b5c568; --olive-dark: #6f7f2a; --bg: #14130d; --fg: #f4efdc; --muted: #a8a38e; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-         min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+         min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center;
+         padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  /* The photo and its tip sit in the middle of the screen */
+  main { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 0; }
   .brand { font-family: "Booth Serif", Georgia, serif; font-style: italic; font-size: 2.2rem; line-height: 1.2; margin: 22px 0 4px;
            background: linear-gradient(180deg, var(--olive-light), var(--olive-dark)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .meta { color: var(--muted); font-size: .95rem; margin: 0 16px 14px; text-align: center; }
-  .photo { width: min(96vw, 560px); margin-top: calc(10px + env(safe-area-inset-top)); border-radius: 14px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.5); background: #000; }
-  .photo img { width: 100%; display: block; }
-  .actions { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 520px); margin: 18px 0; }
+  .photo { border-radius: 14px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.5); background: #000; }
+  .photo img { display: block; width: auto; height: auto; max-width: 94vw; max-height: calc(100vh - 210px); max-height: calc(100dvh - 210px); }
+  .actions { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 520px); margin: 16px 0 0; }
   .btn { border: 0; border-radius: 999px; padding: 15px 22px; font-size: 1.05rem; font-weight: 700; background: var(--olive); color: #fff;
          text-align: center; text-decoration: none; cursor: pointer; }
   .btn.ghost { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 2px #444; }
   .btn:disabled { opacity: .6; }
   .tip { color: var(--fg); font-size: 1.05rem; text-align: center; margin: 2px 0 6px; }
   .gone { color: var(--muted); padding: 40px 24px; text-align: center; line-height: 1.5; }
-  footer { color: #6c6858; font-size: .8rem; padding: 10px 16px 30px; text-align: center; margin-top: auto; }
+  footer { color: #6c6858; font-size: .75rem; padding: 6px 16px 14px; text-align: center; }
 </style>
 </head>
 <body>
-<div class="meta" id="meta">Loading your photo…</div>
-<div class="photo" id="photoBox" hidden><img id="img" alt="Your photo booth photo"></div>
-<div class="actions" id="actions" hidden>
-  <div class="tip">📱 Take a screenshot to keep your photo</div>
-  <a class="btn ghost" id="galleryLink" hidden></a>
-</div>
-<div class="gone" id="gone" hidden></div>
+<main>
+  <div class="meta" id="meta">Loading your photo…</div>
+  <div class="photo" id="photoBox" hidden><img id="img" alt="Your photo booth photo"></div>
+  <div class="actions" id="actions" hidden>
+    <div class="tip">📱 Take a screenshot to keep your photo</div>
+    <a class="btn ghost" id="galleryLink" hidden></a>
+  </div>
+  <div class="gone" id="gone" hidden></div>
+</main>
 <footer>Serendipity · 21–23 High Street, Horley · Photos are deleted automatically after 7 days</footer>
 <script>
 const $ = id => document.getElementById(id);
