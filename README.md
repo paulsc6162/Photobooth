@@ -6,11 +6,7 @@ A full-screen photo booth for a portrait-mounted Android tablet, run entirely by
 
 **Guests**
 1. **Touch anywhere** on the start screen, then a **5-second countdown** and the photo is taken.
-2. The photo shows full screen with four buttons:
-   - **↺ Retake**
-   - **✨ Glam it**: a soft, flattering filter. Tap again to turn it off.
-   - **🪄 AI theme it**: opens the AI screen (see below)
-   - **✓ Accept**
+2. The photo shows full screen with **↺ Retake**, **🪄 AI theme it** (once set up, see below) and **✓ Accept**.
 3. On **Accept**, the photo is saved, and the buttons are replaced by one QR code titled **"Take it home"**. Guests point their phone camera at it, which opens their photo, and screenshot it to keep it.
 4. After 45 seconds, or a tap on **Done**, the booth goes back to the start screen.
 
@@ -21,7 +17,7 @@ A full-screen photo booth for a portrait-mounted Android tablet, run entirely by
    - **Theme the clothing**: keeps the background
 2. A grid of 12 theme icons appears: Italian Riviera, 1920s Gatsby, Hollywood, Tropical Beach, Christmas, Winter Wonderland, Space Explorers, Wild West, Royal Ball, 70s Disco, Under the Sea and Superheroes.
 3. After about 20 seconds, the booth goes back to the photo screen with the themed picture. The AI button then shows the theme's name.
-   - Guests can still tap **Glam it** or **Retake**, try another theme, or choose **Use my original photo**.
+   - Guests can still tap **Retake**, try another theme, or choose **Use my original photo**.
    - Each new theme is applied to the **original** photo, so effects never pile up.
    - The party title and the Serendipity strip are added after the AI, so they always look right.
 4. If the AI can't do a photo, the guest sees a friendly message and can pick another theme.
@@ -42,7 +38,7 @@ A full-screen photo booth for a portrait-mounted Android tablet, run entirely by
 ## Files
 | File | What it does |
 |---|---|
-| `index.html` | The booth app: camera, countdown, Glam filter, "Take it home" QR code and party slideshow |
+| `index.html` | The booth app: camera, countdown, AI theme it, "Take it home" QR code and party slideshow |
 | `g.html` | The party gallery: full-screen photos to swipe through |
 | `p.html` | The single-photo page that the "Take it home" QR opens |
 | `netlify/functions/upload-photo.mjs` | Receives each photo (plus a small thumbnail) from the booth and stores it |
@@ -121,7 +117,7 @@ From there you can:
 After 5 wrong PINs, the screen locks for 5 minutes. **Forgotten it?** Exit Fully with the Kiosk Exit PIN, then clear Fully's web storage. The next 5 taps will ask for a new PIN.
 
 ## Running costs
-- **The booth app:** free. The Glam filter, QR codes and slideshow all run on the tablet.
+- **The booth app:** free. The QR codes and slideshow run on the tablet.
 - **AI theme it:** Google charges about **$0.067 (about 5p) per AI photo** at standard (1K) quality, or about $0.10 at 2K. Every theme a guest tries counts, including trying a second theme on the same photo.
   - A party where 60 guests each try one or two themes costs roughly **£3–£6**.
   - `AI_DAILY_LIMIT` (300 by default, about £15 a day at most) stops costs running away.

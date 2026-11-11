@@ -84,7 +84,7 @@
   #hostQRBox p { color: #333; margin: .4em 0 0; font-size: 1rem; }
 
   /* Accept → saving → Take it home (same screen, buttons swap for the QR code) */
-  #editBar { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8em; }
+  #editBar { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8em; }
   #editBar, #savingBar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
                          background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.75) 35%); padding: 6vh 3vw 3vh !important; }
   #editBar[hidden] { display: none; }
@@ -119,7 +119,6 @@
   #aiBusy h2 { font-size: clamp(1.8rem, 6vw, 3rem); }
   .aiProgress { width: min(520px, 80vw); height: 10px; background: #2e2840; border-radius: 99px; overflow: hidden; margin-top: 1.5em; }
   #aiBar { height: 100%; width: 0; background: linear-gradient(90deg, #8a6ad8, #e06fb3); border-radius: 99px; }
-  #glamBtn.on { background: #3a2f17; color: var(--accent); box-shadow: inset 0 0 0 3px var(--accent); }
   .bar.saving { justify-content: center; gap: 1em; font-size: clamp(1.2rem, 3.4vw, 1.8rem); padding: 3vh; }
   .bar.saving[hidden], #takeHome[hidden] { display: none; }
   .spinner.sm { width: 40px; height: 40px; border-width: 5px; margin: 0; }
@@ -181,7 +180,6 @@
     .bar > .group:not(.tools) { flex: 1; }
     .bar > .group:not(.tools) .btn { flex: 1; }
     #camHint { bottom: 8vh; }
-    #editBar { grid-template-columns: 1fr 1fr; }
     .aiModes { gap: 2.2vh; }
     .modeBtn { padding: 1.6em 1.5em; }
     .modeBtn .mi { font-size: clamp(3rem, 9vw, 4.4rem); }
@@ -258,7 +256,6 @@
 
   <div class="bar" id="editBar">
     <button class="btn secondary" id="retakeBtn">↺ Retake</button>
-    <button class="btn secondary" id="glamBtn">✨ Glam it</button>
     <button class="btn secondary aiBtn" id="aiBtn">🪄 AI theme it</button>
     <button class="btn" id="acceptBtn">✓ Accept</button>
   </div>
@@ -376,7 +373,7 @@ Object.assign(CONFIG, JSON.parse(safeGet('booth.settings.v2') || '{}'));
 const $ = id => document.getElementById(id);
 const video = $('video');
 const photo = $('photo'), pctx = photo.getContext('2d');
-let stream = null, busy = false, idleTimer = null, finalDataUrl = null, thumbDataUrl = null, glam = false, homeTimer = null;
+let stream = null, busy = false, idleTimer = null, finalDataUrl = null, thumbDataUrl = null, homeTimer = null;
 let aiCanvas = null, aiThemeLabel = '', aiMode = 'full', aiWorking = false;   // AI-themed version of the photo (null = original)
 
 document.querySelectorAll('.keepDays').forEach(e => e.textContent = CONFIG.keepDays);
@@ -554,51 +551,9 @@ function captureFrame() {
   r.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
   r.restore();
   aiCanvas = null; aiThemeLabel = '';
-  filterCache.clear();
 }
 
-/* ---------- "Glam it" filter (applied to the photo itself, before the title and Serendipity strip) ---------- */
-const filterCache = new Map();   // filter id → canvas, for the current photo
-function applyFilter(src, id, w, h) {
-  const out = document.createElement('canvas'); out.width = w; out.height = h;
-  const c = out.getContext('2d'), u = Math.min(w, h);
-  if (id === 'glam') {
-    // Soft-focus "beauty" look: brighter, slightly warm, with a blurred layer that smooths skin
-    c.filter = 'brightness(1.07) contrast(1.04) saturate(1.08)';
-    c.drawImage(src, 0, 0, w, h);
-    c.filter = `blur(${Math.max(2, u * 0.007)}px) brightness(1.1)`;
-    c.globalAlpha = 0.42; c.globalCompositeOperation = 'lighten';
-    c.drawImage(src, 0, 0, w, h);
-    c.globalAlpha = 0.18; c.globalCompositeOperation = 'screen';
-    c.filter = `blur(${Math.max(4, u * 0.02)}px)`;          // gentle glow
-    c.drawImage(src, 0, 0, w, h);
-    c.filter = 'none'; c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
-    c.fillStyle = 'rgba(255,214,186,0.06)'; c.fillRect(0, 0, w, h);   // warm, flattering tint
-  } else if (id === 'bw') {
-    c.filter = 'grayscale(1) contrast(1.22) brightness(1.04)';
-    c.drawImage(src, 0, 0, w, h);
-    c.filter = 'none';
-  } else if (id === 'vintage') {
-    c.filter = 'sepia(0.45) saturate(0.85) contrast(0.9) brightness(1.06)';
-    c.drawImage(src, 0, 0, w, h);
-    c.filter = 'none';
-    c.globalCompositeOperation = 'lighten';                 // faded, milky blacks
-    c.fillStyle = 'rgb(46,36,26)'; c.fillRect(0, 0, w, h);
-    c.globalCompositeOperation = 'source-over';
-    c.fillStyle = 'rgba(255,190,120,0.07)'; c.fillRect(0, 0, w, h);
-    const v = c.createRadialGradient(w / 2, h / 2, u * 0.35, w / 2, h / 2, Math.hypot(w, h) * 0.6);
-    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(40,25,10,0.45)');
-    c.fillStyle = v; c.fillRect(0, 0, w, h);               // soft vignette
-  } else {
-    c.drawImage(src, 0, 0, w, h);
-  }
-  return out;
-}
 const baseImage = () => aiCanvas || raw;          // the AI-themed photo, or the original
-function filtered(id) {
-  if (!filterCache.has(id)) filterCache.set(id, applyFilter(baseImage(), id, raw.width, raw.height));
-  return filterCache.get(id);
-}
 /* ---------- Compose the final picture ---------- */
 function render() {
   const w = photo.width, h = photo.height;
@@ -607,7 +562,7 @@ function render() {
 }
 function composeInto(ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
-  ctx.drawImage(glam ? filtered('glam') : baseImage(), 0, 0, w, h);
+  ctx.drawImage(baseImage(), 0, 0, w, h);
   drawPartyText(ctx, w, h);
   drawWatermark(ctx, w, h);
 }
@@ -678,17 +633,12 @@ function drawPartyText(ctx, w, h) {
   ctx.restore();
 }
 
-/* ---------- Edit screen: Retake / Glam it / Accept, then "Take it home" ---------- */
+/* ---------- Edit screen: Retake / AI theme it / Accept, then "Take it home" ---------- */
 function setEditMode(mode) {          // 'choose' | 'saving' | 'home'
   $('editBar').hidden = mode !== 'choose';
   $('savingBar').hidden = mode !== 'saving';
   $('takeHome').hidden = mode !== 'home';
 }
-function refreshGlam() {
-  $('glamBtn').classList.toggle('on', glam);
-  $('glamBtn').textContent = glam ? '✨ Glam on' : '✨ Glam it';
-}
-$('glamBtn').onclick = () => { glam = !glam; refreshGlam(); render(); };
 
 /* ---------- AI theme it ---------- */
 const AI_THEMES = [   // icons for the tablet – the actual AI instructions live in the Supabase function
@@ -732,11 +682,11 @@ $('aiBack').onclick = () => {
   if (!$('aiThemes').hidden) { $('aiThemes').hidden = true; $('aiModes').hidden = false; $('aiSub').textContent = 'How would you like to theme your photo?'; }
   else backToPhoto();
 };
-$('aiOriginal').onclick = () => { aiCanvas = null; aiThemeLabel = ''; filterCache.clear(); backToPhoto(); };
+$('aiOriginal').onclick = () => { aiCanvas = null; aiThemeLabel = ''; backToPhoto(); };
 function backToPhoto() { refreshAiBtn(); setEditMode('choose'); show('edit'); render(); }
 function refreshAiBtn() {
   $('aiBtn').hidden = !aiEnabled();
-  $('editBar').style.gridTemplateColumns = aiEnabled() ? '' : 'repeat(3, 1fr)';
+  $('editBar').style.gridTemplateColumns = aiEnabled() ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
   $('aiBtn').classList.toggle('on', !!aiCanvas);
   $('aiBtn').textContent = aiCanvas ? `🪄 ${aiThemeLabel}` : '🪄 AI theme it';
 }
@@ -752,7 +702,7 @@ async function runAi(theme) {
     const c = document.createElement('canvas'); c.width = raw.width; c.height = raw.height;
     const k = Math.max(c.width / img.width, c.height / img.height), dw = img.width * k, dh = img.height * k;
     c.getContext('2d').drawImage(img, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
-    aiCanvas = c; aiThemeLabel = theme.label; filterCache.clear();
+    aiCanvas = c; aiThemeLabel = theme.label;
     bar.style.transition = 'width .3s'; bar.style.width = '100%';
     await sleep(300);
     aiWorking = false; $('aiBusy').hidden = true;
@@ -820,7 +770,7 @@ async function takePhoto() {
     cd.textContent = ''; $('camHint').textContent = '';
     captureFrame();
     const f = $('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
-    glam = false; refreshGlam(); refreshAiBtn(); setEditMode('choose');
+    refreshAiBtn(); setEditMode('choose');
     show('edit');
     render();
   } catch (e) {
