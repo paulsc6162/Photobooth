@@ -304,7 +304,6 @@
 <section id="error" class="screen">
   <h1>Hmm, that didn't work</h1>
   <p id="errorMsg"></p>
-  <p id="errorDetail" style="font-size:.85rem;color:#777;max-width:40em;word-break:break-word"></p>
   <div class="row" style="margin-top:1.5em">
     <button class="btn secondary" id="errHomeBtn">Start over</button>
     <button class="btn" id="errRetryBtn">Try again</button>
@@ -858,8 +857,7 @@ async function uploadPhoto() {
     showTakeHome(id, expires);
   } catch (e) {
     console.error(e);
-    showError("We couldn't save your photo just now – please check the Wi-Fi and try again.",
-              e.name === 'AbortError' ? 'Timed out after 40 seconds' : String(e.message || e));
+    showError("We couldn't save your photo just now – please check the Wi-Fi and try again.");
   }
 }
 function showTakeHome(id, expires) {
@@ -870,11 +868,7 @@ function showTakeHome(id, expires) {
   clearTimeout(homeTimer);
   homeTimer = setTimeout(() => { if ($('edit').classList.contains('active') && !$('takeHome').hidden) resetAll(); }, CONFIG.takeHomeSeconds * 1000);
 }
-function showError(msg, detail) {
-  $('errorMsg').textContent = msg;
-  $('errorDetail').textContent = detail ? `Details for staff: ${detail}` : '';
-  show('error');
-}
+function showError(msg) { $('errorMsg').textContent = msg; show('error'); }
 
 function resetAll() {
   finalDataUrl = thumbDataUrl = null; clearTimeout(homeTimer);

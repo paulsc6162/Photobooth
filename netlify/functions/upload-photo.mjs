@@ -9,9 +9,10 @@ import { json, db, upload, randomId, ID_RE, KEEP_DAYS } from '../lib/shared.mjs'
 export default async (req) => {
   if (req.method !== 'POST') return json(405, { ok: false, error: 'POST only' });
   const boothKey = (process.env.BOOTH_KEY || '').trim();          // ignore stray spaces from copy-and-paste
-  if (!boothKey) return json(401, { ok: false, error: 'Unauthorised', detail: 'BOOTH_KEY is not set in Netlify' });
-  if ((req.headers.get('x-booth-key') || '').trim() !== boothKey)
-    return json(401, { ok: false, error: 'Unauthorised', detail: `booth key does not match Netlify BOOTH_KEY (Netlify's starts "${boothKey.slice(0, 6)}…", ${boothKey.length} characters)` });
+  if (!boothKey || (req.headers.get('x-booth-key') || '').trim() !== boothKey) {
+    console.error('Upload refused: booth key missing or does not match BOOTH_KEY');
+    return json(401, { ok: false, error: 'Unauthorised' });
+  }
 
   let body;
   try { body = await req.json(); } catch { return json(400, { ok: false, error: 'Bad JSON' }); }
@@ -42,8 +43,7 @@ export default async (req) => {
     return json(200, { ok: true, id, expires });
   } catch (e) {
     console.error('Upload failed', e);
-    // Short technical detail so the problem can be diagnosed from the booth's error screen
-    return json(502, { ok: false, error: 'Upload failed', detail: String(e && e.message || e).slice(0, 220) });
+    return json(502, { ok: false, error: 'Upload failed' });   // full detail is in Netlify's function logs
   }
 };
 
