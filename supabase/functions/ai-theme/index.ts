@@ -30,6 +30,7 @@ const THEMES: Record<string, { scene: string; background: string; outfit: string
   whitehouse: { scene: 'a visit to the White House', background: 'the White House in Washington DC, seen across the green lawn on a sunny day', outfit: 'smart formal business attire – tailored suits and elegant dresses' },
   coffee:     { scene: 'a trendy coffee shop', background: 'a stylish, trendy coffee shop with exposed brick, hanging plants, Edison bulbs and a gleaming espresso machine', outfit: 'relaxed trendy outfits – chunky knitwear, denim and smart-casual layers' },
   tropical:   { scene: 'a tropical beach party', background: 'a white-sand tropical beach with palm trees, turquoise water and a golden sunset', outfit: 'colourful tropical beach-party outfits – Hawaiian shirts, flower leis and summer dresses' },
+  fantasy:    { scene: 'an epic medieval fantasy kingdom', background: 'the great hall of a stone castle with banners, flaming torches and a carved wooden throne, with a dragon flying past the tall window', outfit: 'original medieval fantasy outfits – fur-trimmed cloaks, leather and chainmail armour, and flowing noble gowns, with no recognisable characters or house emblems' },
   pirates:    { scene: 'a pirate adventure', background: 'the deck of a wooden pirate ship on a turquoise sea, with billowing sails and a treasure island in the distance', outfit: 'pirate outfits – tricorn hats, bandanas, billowing shirts, waistcoats and boots' },
   wildwest:   { scene: 'a Wild West saloon', background: 'a dusty Wild West town street with a wooden saloon and desert hills at sunset', outfit: 'Wild West cowboy and cowgirl outfits – cowboy hats, waistcoats, bandanas and boots' },
   disco:      { scene: 'a 1970s disco night', background: 'a 1970s disco dance floor with a mirror ball, colourful lights and a light-up floor', outfit: '1970s disco outfits – sequins, wide collars, flared trousers and glitter' },
@@ -47,6 +48,7 @@ const ROLES: Record<string, string> = {
   popdiva:    'a pop diva in a sparkling sequinned stage outfit with a headset microphone',
   royalty:    'royalty with a crown or tiara, an ermine-trimmed robe and a royal sash',
   sports:     'a sports champion in a bold team kit with no real club badges or logos, wearing a gold winner\'s medal',
+  robot:      'a futuristic robot in a sleek chrome and white armoured suit with glowing blue light panels, with the face left fully visible and human',
   supermodel: 'a supermodel in a striking high-fashion designer look'
 };
 
