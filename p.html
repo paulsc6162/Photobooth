@@ -20,7 +20,7 @@
            background: linear-gradient(180deg, var(--olive-light), var(--olive-dark)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .meta { color: var(--muted); font-size: .95rem; margin: 0 16px 14px; text-align: center; }
   .photo { border-radius: 14px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.5); background: #000; }
-  .photo img { display: block; width: auto; height: auto; max-width: 94vw; max-height: calc(100vh - 210px); max-height: calc(100dvh - 210px); }
+  .photo img { transition: filter .3s; display: block; width: auto; height: auto; max-width: 94vw; max-height: calc(100vh - 210px); max-height: calc(100dvh - 210px); }
   .actions { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 520px); margin: 16px 0 0; }
   .btn { border: 0; border-radius: 999px; padding: 15px 22px; font-size: 1.05rem; font-weight: 700; background: var(--olive); color: #fff;
          text-align: center; text-decoration: none; cursor: pointer; }
@@ -45,28 +45,38 @@
 <script>
 const $ = id => document.getElementById(id);
 const photoId = new URLSearchParams(location.search).get('i') || '';
-const fmtDate = d => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
-(async () => {
-  try {
-    const r = await fetch(`/.netlify/functions/gallery?p=${encodeURIComponent(photoId)}`, { cache: 'no-store' });
-    const d = await r.json();
-    if (!r.ok || !d.ok) throw Object.assign(new Error(d.error), { gone: r.status === 404 });
-    $('img').src = d.url;
-    $('meta').hidden = true;
-    $('photoBox').hidden = false; $('actions').hidden = false;
-    if (d.party) {
-      const a = $('galleryLink'); a.hidden = false;
-      a.href = `g.html?g=${encodeURIComponent(d.party.id)}`;
-      a.textContent = `See all photos from ${d.party.name}`;
-    }
-  } catch (e) {
-    $('meta').textContent = '';
-    $('gone').hidden = false;
-    $('gone').textContent = e.gone ? 'This photo has expired (photos are kept for 7 days) or the link is wrong.' : "Couldn't load your photo – please check your connection and try again.";
-  }
-})();
+// Start loading the picture straight away: a small preview first, then the full photo
+const fn = '/.netlify/functions/gallery';
+const img = $('img');
+let shown = false;
+function showPhoto() {
+  if (shown) return; shown = true;
+  $('meta').hidden = true; $('photoBox').hidden = false; $('actions').hidden = false;
+}
+function gone() {
+  if (shown) return;
+  $('meta').textContent = '';
+  $('gone').hidden = false;
+  $('gone').textContent = 'This photo has expired (photos are kept for 7 days) or the link is wrong.';
+}
+img.onload = showPhoto;
+img.onerror = gone;
+img.src = `${fn}?img=${encodeURIComponent(photoId)}&thumb=1`;
+const full = new Image();
+full.onload = () => { img.onerror = null; img.src = full.src; showPhoto(); };
+full.src = `${fn}?img=${encodeURIComponent(photoId)}`;
 
+// Meanwhile, check whether it belongs to a party gallery (for the "See all photos" button)
+fetch(`${fn}?p=${encodeURIComponent(photoId)}`, { cache: 'no-store' })
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+    if (!d || !d.ok || !d.party) return;
+    const a = $('galleryLink'); a.hidden = false;
+    a.href = `g.html?g=${encodeURIComponent(d.party.id)}`;
+    a.textContent = `See all photos from ${d.party.name}`;
+  })
+  .catch(() => {});
 </script>
 </body>
 </html>

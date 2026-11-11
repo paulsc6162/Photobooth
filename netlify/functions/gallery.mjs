@@ -1,11 +1,21 @@
 // Netlify Function (public, read-only): data for the gallery and photo pages, and the booth slideshow.
 //   GET ?g=<partyId>  → { name, expires, photos: [{ id, url, thumb, taken }] }   (newest first)
 //   GET ?p=<photoId>  → { url, thumb, expires, party: { id, name } | null }
+//   GET ?img=<photoId>[&thumb=1] → redirect straight to the image (used by the photo page to start loading at once)
 // Ids are long and random, so only people with the QR code / link can see anything.
 import { json, db, publicUrl, ID_RE } from '../lib/shared.mjs';
 
 export default async (req) => {
-  const q = new URL(req.url).searchParams, g = q.get('g'), p = q.get('p');
+  const q = new URL(req.url).searchParams, g = q.get('g'), p = q.get('p'), img = q.get('img');
+
+  // Fast path for the photo page: jump straight to the picture in storage (no database lookup).
+  // ?img=<id> → full photo, ?img=<id>&thumb=1 → small preview. Expired photos are deleted, so they 404.
+  if (img) {
+    if (!ID_RE.test(img)) return new Response('Not found', { status: 404 });
+    return new Response(null, { status: 302, headers: {
+      Location: publicUrl(`${q.get('thumb') ? 'thumbs' : 'photos'}/${img}.jpg`),
+      'Cache-Control': 'public, max-age=86400' } });
+  }
   const now = new Date().toISOString();
   const gone = () => json(404, { ok: false, error: 'This gallery has expired or does not exist.' });
   try {
