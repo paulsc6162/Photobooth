@@ -54,7 +54,23 @@ const ROLES: Record<string, string> = {
 
 const KEEP = 'Keep every person exactly as they are: the same faces, facial features, expressions, skin tones, hair, body shapes, poses and positions, so everyone is instantly recognisable. Do not add or remove people. Keep the same framing and composition. Photorealistic, natural lighting that matches the scene. Do not add any text, words, logos or watermarks.';
 
-function prompt(mode: string, t: { scene: string; background: string; outfit: string }, roles: string[] = []) {
+// "More AI": extra touches applied on top of an already-themed photo.
+const FACES = 'Keep every person\'s face, facial features, expressions and identity exactly the same so everyone is instantly recognisable, and keep the same poses, positions, framing and composition. Photorealistic. Do not add any text, words, logos or watermarks.';
+const NO_NEW_PEOPLE = 'Do not add or remove people.';
+type Theme = { scene: string; background: string; outfit: string };
+const EXTRAS: Record<string, (t: Theme, roles: string[]) => string> = {
+  day:       () => `Edit this photo: change the time of day to a bright, sunny daytime with natural daylight on the scene and the people. Keep the setting, the people and their clothes the same. ${NO_NEW_PEOPLE} ${FACES}`,
+  night:     () => `Edit this photo: change the time of day to night-time – a dark evening sky, glowing lights and atmospheric evening lighting on the people. Keep the setting, the people and their clothes the same. ${NO_NEW_PEOPLE} ${FACES}`,
+  crowd:     () => `Edit this photo: add a few extra party guests in the background, dressed to suit the scene and enjoying themselves, standing behind the main people and never covering them. The extra guests must be ordinary, unrecognisable people – not real celebrities. Keep the main people and their clothes exactly as they are. ${FACES}`,
+  newbg:     (t) => `Edit this photo: replace the background with a fresh, different view of ${t.background} – a new angle or a different spot in the same setting. Leave the people, including their clothes, completely unchanged. ${NO_NEW_PEOPLE} ${FACES}`,
+  newoutfit: (t, roles) => `Edit this photo: give every person a different outfit in the same theme – ${roles.length ? roles.map(r => ROLES[r]).join('; ') : t.outfit} – clearly different from what they are wearing now. Leave the background completely unchanged. ${NO_NEW_PEOPLE} ${FACES}`,
+  tan:       () => `Edit this photo: give every person a subtle, natural-looking holiday glow – a light, warm sun-kissed tan. Keep each person's own natural skin tone clearly recognisable; this is only a gentle warm glow. Change nothing else. ${NO_NEW_PEOPLE} ${FACES}`,
+  longhair:  () => `Edit this photo: give every person long, flowing, glossy hair in their own natural hair colour, styled to suit them. Change nothing else. ${NO_NEW_PEOPLE} ${FACES}`,
+  fit:       () => `Edit this photo: give every adult a fit, toned, athletic build – strong shoulders and arms – while keeping them fully dressed in the same outfits, with nothing revealing. Leave any children exactly as they are. Change nothing else. ${NO_NEW_PEOPLE} ${FACES}`,
+  model:     () => `Edit this photo: give every person a glamorous model makeover – professionally styled hair, polished make-up or grooming, and flattering magazine-cover lighting – while their faces stay clearly the same people. Keep their clothes and the background. ${NO_NEW_PEOPLE} ${FACES}`
+};
+
+function prompt(mode: string, t: Theme, roles: string[] = []) {
   if (mode === 'background')
     return `Edit this photo: replace only the background behind the people with ${t.background}. Leave the people – including their clothes – completely unchanged. ${KEEP}`;
   if (mode === 'clothing')
@@ -105,14 +121,17 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json(405, { ok: false, error: 'POST only' });
   if (!env('BOOTH_KEY') || req.headers.get('x-booth-key') !== env('BOOTH_KEY')) return json(401, { ok: false, error: 'Unauthorised' });
 
-  let body: { image?: string; theme?: string; mode?: string; aspect?: string; roles?: unknown };
+  let body: { image?: string; theme?: string; mode?: string; aspect?: string; roles?: unknown; extra?: string };
   try { body = await req.json(); } catch { return json(400, { ok: false, error: 'Bad JSON' }); }
   const { image, theme = '', mode = 'full', aspect = '9:16' } = body;
   const t = THEMES[theme];
-  if (!t || !['full', 'background', 'clothing', 'star'].includes(mode)) return json(400, { ok: false, error: 'Unknown theme' });
+  if (!t || !['full', 'background', 'clothing', 'star', 'extra'].includes(mode)) return json(400, { ok: false, error: 'Unknown theme' });
   const roles = Array.isArray(body.roles) ? [...new Set(body.roles.filter((r): r is string => typeof r === 'string' && r in ROLES))] : [];
   if (mode === 'star' && !roles.length) return json(400, { ok: false, error: 'Pick a star' });
-  const logMode = mode === 'star' ? `star:${roles.join('+')}` : mode;
+  const extra = typeof body.extra === 'string' ? body.extra : '';
+  if (mode === 'extra' && !(extra in EXTRAS)) return json(400, { ok: false, error: 'Unknown option' });
+  const logMode = mode === 'star' ? `star:${roles.join('+')}` : mode === 'extra' ? `extra:${extra}` : mode;
+  const text = mode === 'extra' ? EXTRAS[extra](t, roles) : prompt(mode, t, roles);
   if (typeof image !== 'string' || !image || image.length > 4_000_000) return json(400, { ok: false, error: 'Bad image' });
   if (!['9:16', '2:3', '3:4', '4:5', '1:1', '5:4', '4:3', '3:2', '16:9'].includes(aspect)) return json(400, { ok: false, error: 'Bad aspect' });
 
@@ -126,7 +145,7 @@ Deno.serve(async (req: Request) => {
       method: 'POST',
       headers: { 'x-goog-api-key': env('GEMINI_API_KEY'), 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt(mode, t, roles) }, { inlineData: { mimeType: 'image/jpeg', data: image } }] }],
+        contents: [{ role: 'user', parts: [{ text }, { inlineData: { mimeType: 'image/jpeg', data: image } }] }],
         generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: aspect, imageSize: env('AI_IMAGE_SIZE', '1K') } }
       })
     });

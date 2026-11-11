@@ -263,6 +263,7 @@
   <div class="bar" id="editBar">
     <button class="btn secondary" id="retakeBtn">↺ Retake</button>
     <button class="btn secondary aiBtn" id="aiBtn">🪄 AI theme it</button>
+    <button class="btn secondary aiBtn" id="moreAiBtn" hidden>✨ More AI</button>
     <button class="btn" id="acceptBtn">✓ Accept</button>
   </div>
 
@@ -294,6 +295,7 @@
     <p class="aiNote">Your photo is sent to Google's AI to create the themed version – it takes about 20 seconds.</p>
     <div class="row">
       <button class="btn secondary" id="aiBack">← Back</button>
+      <button class="btn secondary" id="aiUndo" hidden>↶ Undo last change</button>
       <button class="btn secondary" id="aiOriginal" hidden>↺ Use my original photo</button>
       <button class="btn primary" id="aiNext" hidden>Next →</button>
     </div>
@@ -382,7 +384,7 @@ const $ = id => document.getElementById(id);
 const video = $('video');
 const photo = $('photo'), pctx = photo.getContext('2d');
 let stream = null, busy = false, idleTimer = null, finalDataUrl = null, thumbDataUrl = null, homeTimer = null;
-let aiCanvas = null, aiThemeLabel = '', aiMode = 'full', aiWorking = false;   // AI-themed version of the photo (null = original)
+let aiCanvas = null, aiThemeLabel = '', aiMode = 'full', aiWorking = false, aiLast = null, aiHistory = [];   // AI-themed version of the photo (null = original)
 
 document.querySelectorAll('.keepDays').forEach(e => e.textContent = CONFIG.keepDays);
 
@@ -558,7 +560,7 @@ function captureFrame() {
   if (CONFIG.mirror) { r.translate(w, 0); r.scale(-1, 1); }
   r.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
   r.restore();
-  aiCanvas = null; aiThemeLabel = '';
+  aiCanvas = null; aiThemeLabel = ''; aiLast = null; aiHistory = [];
 }
 
 const baseImage = () => aiCanvas || raw;          // the AI-themed photo, or the original
@@ -685,6 +687,17 @@ const STAR_ROLES = [
   { id: 'robot',      label: 'Futuristic Robot', emoji: '🤖', colors: ['#3a4a5c', '#2ec4f1'] },
   { id: 'supermodel', label: 'Supermodel',      emoji: '💃', colors: ['#111111', '#e0388b'] }
 ];
+const AI_EXTRAS = [   // "More AI" – applied on top of the themed photo
+  { id: 'day',       label: 'Day time',               emoji: '☀️', colors: ['#f6c945', '#4fa3e0'] },
+  { id: 'night',     label: 'Night time',             emoji: '🌙', colors: ['#141a3a', '#5a3fa8'] },
+  { id: 'crowd',     label: 'More people',            emoji: '👥', colors: ['#c0392b', '#8e44ad'] },
+  { id: 'newbg',     label: 'New background, same theme', emoji: '🏞️', colors: ['#1fb5a8', '#2a6fbd'] },
+  { id: 'newoutfit', label: 'New outfits, same theme',    emoji: '👗', colors: ['#e0389b', '#f2a33a'] },
+  { id: 'tan',       label: 'Holiday tan',            emoji: '🏖️', colors: ['#f7a541', '#c0622b'] },
+  { id: 'longhair',  label: 'Long hair',              emoji: '💇', colors: ['#8a5a2b', '#d4a64a'] },
+  { id: 'fit',       label: 'Fit & muscular',         emoji: '💪', colors: ['#2b2b2b', '#d62828'] },
+  { id: 'model',     label: 'Model makeover',         emoji: '💄', colors: ['#111111', '#e0388b'] }
+];
 const MODE_TEXT = { full: 'Pick a theme for the whole picture', background: 'Pick a new background', clothing: 'Pick new outfits', star: 'Now pick where you are' };
 const aiEnabled = () => CONFIG.demo || !/YOUR-PROJECT/.test(CONFIG.aiEndpoint || 'YOUR-PROJECT');
 let aiStep = 'modes', starRoles = new Set();
@@ -699,9 +712,12 @@ function tileFor(t) {
 function aiShowStep(step) {
   aiStep = step;
   const grid = $('aiThemes'); grid.innerHTML = ''; grid.classList.toggle('roles', step === 'roles');
+  if (step !== 'more') $('aiUndo').hidden = true;
+  document.querySelector('.aiTitle').textContent = step === 'more' ? '✨ More AI' : '🪄 AI theme it';
   $('aiModes').hidden = step !== 'modes'; grid.hidden = step === 'modes';
   $('aiNext').hidden = true;
   if (step === 'modes') { $('aiSub').textContent = 'How would you like to theme your photo?'; return; }
+  $('aiUndo').hidden = !(step === 'more' && aiHistory.length);
   if (step === 'roles') {
     $('aiSub').textContent = 'Who do you want to be?';
     STAR_ROLES.forEach(r => {
@@ -711,13 +727,19 @@ function aiShowStep(step) {
     });
     return;
   }
+  if (step === 'more') {
+    grid.classList.add('roles');
+    $('aiSub').textContent = 'Add something more to your photo';
+    AI_EXTRAS.forEach(x => { const tile = tileFor(x); tile.onclick = () => runExtra(x); grid.appendChild(tile); });
+    return;
+  }
   $('aiSub').textContent = MODE_TEXT[aiMode];
   AI_THEMES.forEach(t => { const tile = tileFor(t); tile.onclick = () => runAi(t); grid.appendChild(tile); });
   $('ai').scrollTop = 0;
 }
-function openAi() {
+function openAi(step = 'modes') {
   $('aiBusy').hidden = true; starRoles = new Set();
-  aiShowStep('modes');
+  aiShowStep(step);
   $('aiOriginal').hidden = !aiCanvas;
   show('ai');
 }
@@ -728,30 +750,40 @@ document.querySelectorAll('.modeBtn').forEach(b => b.onclick = () => {
 $('aiNext').onclick = () => { if (starRoles.size) aiShowStep('themes'); };
 $('aiBack').onclick = () => {
   if (aiStep === 'themes' && aiMode === 'star') aiShowStep('roles');
+  else if (aiStep === 'more') backToPhoto();
   else if (aiStep !== 'modes') aiShowStep('modes');
   else backToPhoto();
 };
-$('aiOriginal').onclick = () => { aiCanvas = null; aiThemeLabel = ''; backToPhoto(); };
+$('aiOriginal').onclick = () => { aiCanvas = null; aiThemeLabel = ''; aiLast = null; aiHistory = []; backToPhoto(); };
+$('aiUndo').onclick = () => { if (aiHistory.length) { aiCanvas = aiHistory.pop(); backToPhoto(); } };
+$('moreAiBtn').onclick = () => openAi('more');
 function backToPhoto() { refreshAiBtn(); setEditMode('choose'); show('edit'); render(); }
 function refreshAiBtn() {
-  $('aiBtn').hidden = !aiEnabled();
-  $('editBar').style.gridTemplateColumns = aiEnabled() ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)';
+  const more = aiEnabled() && !!aiCanvas && !!aiLast;
+  $('aiBtn').hidden = !aiEnabled(); $('moreAiBtn').hidden = !more;
+  $('editBar').style.gridTemplateColumns = `repeat(${aiEnabled() ? (more ? 4 : 3) : 2}, 1fr)`;
   $('aiBtn').classList.toggle('on', !!aiCanvas);
-  $('aiBtn').textContent = aiCanvas ? (aiThemeLabel.startsWith('⭐') ? aiThemeLabel : `🪄 ${aiThemeLabel}`) : '🪄 AI theme it';
+  $('aiBtn').textContent = aiCanvas ? '🪄 New theme' : '🪄 AI theme it';
 }
 
-async function runAi(theme) {
-  $('aiBusyTitle').textContent = `Creating your ${theme.label} photo…`;
+function aiSource() {   // the picture the AI works on, at most 1536px (no title or Serendipity strip – those are added afterwards)
+  const src = aiCanvas || raw, long = 1536, s = Math.min(1, long / Math.max(src.width, src.height));
+  const c = document.createElement('canvas'); c.width = Math.round(src.width * s); c.height = Math.round(src.height * s);
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  return c;
+}
+async function aiRun(label, payload, source, onDone) {
+  $('aiBusyTitle').textContent = `Creating your ${label} photo…`;
   $('aiBusy').hidden = false; aiWorking = true; clearTimeout(idleTimer);
   const bar = $('aiBar'); bar.style.transition = 'none'; bar.style.width = '0';
   requestAnimationFrame(() => { bar.style.transition = 'width 25s cubic-bezier(.2,.6,.3,1)'; bar.style.width = '92%'; });
   try {
-    const img = await requestAiImage(theme);
+    const img = await requestAiImage(label, payload, source);
     // Fit the AI picture to the photo's exact size
     const c = document.createElement('canvas'); c.width = raw.width; c.height = raw.height;
     const k = Math.max(c.width / img.width, c.height / img.height), dw = img.width * k, dh = img.height * k;
     c.getContext('2d').drawImage(img, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
-    aiCanvas = c; aiThemeLabel = aiMode === 'star' ? `⭐ ${theme.label}` : theme.label;
+    onDone(c);
     bar.style.transition = 'width .3s'; bar.style.width = '100%';
     await sleep(300);
     aiWorking = false; $('aiBusy').hidden = true;
@@ -759,25 +791,36 @@ async function runAi(theme) {
   } catch (e) {
     console.error(e);
     aiWorking = false; $('aiBusy').hidden = true; resetIdle();
-    $('aiSub').textContent = e.userMessage || "Sorry – the AI couldn't do that one. Try another theme, or go back to your photo.";
+    $('aiSub').textContent = e.userMessage || "Sorry – the AI couldn't do that one. Try another option, or go back to your photo.";
   }
+}
+function runAi(theme) {   // a new theme always starts from the original photo
+  const roles = aiMode === 'star' ? [...starRoles] : undefined;
+  const src = aiCanvas; aiCanvas = null; const source = aiSource(); aiCanvas = src;
+  aiRun(theme.label, { theme: theme.id, mode: aiMode, roles }, source, c => {
+    aiCanvas = c; aiHistory = []; aiLast = { theme: theme.id, mode: aiMode, roles };
+    aiThemeLabel = aiMode === 'star' ? `⭐ ${theme.label}` : theme.label;
+  });
+}
+function runExtra(x) {    // "More AI" builds on the current themed photo
+  if (!aiCanvas || !aiLast) return;
+  aiRun(x.label.toLowerCase(), { mode: 'extra', extra: x.id, theme: aiLast.theme, roles: aiLast.roles, base: aiLast.mode }, aiSource(), c => {
+    aiHistory.push(aiCanvas); if (aiHistory.length > 5) aiHistory.shift();
+    aiCanvas = c;
+  });
 }
 function nearestAspect(r) {   // aspect ratios the image AI supports
   const opts = { '9:16': 9 / 16, '2:3': 2 / 3, '3:4': 3 / 4, '4:5': 4 / 5, '1:1': 1, '5:4': 5 / 4, '4:3': 4 / 3, '3:2': 3 / 2, '16:9': 16 / 9 };
   return Object.entries(opts).sort((a, b) => Math.abs(a[1] - r) - Math.abs(b[1] - r))[0][0];
 }
-async function requestAiImage(theme) {
-  // Send the plain photo (no title or Serendipity strip – those are added afterwards)
-  const long = 1536, s = Math.min(1, long / Math.max(raw.width, raw.height));
-  const c = document.createElement('canvas'); c.width = Math.round(raw.width * s); c.height = Math.round(raw.height * s);
-  c.getContext('2d').drawImage(raw, 0, 0, c.width, c.height);
+async function requestAiImage(label, payload, c) {
   if (CONFIG.demo) {   // demo mode: pretend, so the flow can be tried without the AI
     await sleep(2500);
     const d = document.createElement('canvas'); d.width = c.width; d.height = c.height;
-    const x = d.getContext('2d'); x.filter = 'hue-rotate(160deg) saturate(1.4)'; x.drawImage(c, 0, 0); x.filter = 'none';
+    const x = d.getContext('2d'); x.filter = 'hue-rotate(60deg) saturate(1.4)'; x.drawImage(c, 0, 0); x.filter = 'none';
     x.fillStyle = 'rgba(0,0,0,.45)'; x.fillRect(0, d.height * .45, d.width, d.height * .1);
-    x.fillStyle = "#fff"; x.font = `700 ${d.width * .042}px system-ui`; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillText(`DEMO: ${theme.label} (${aiMode}${aiMode === 'star' ? ': ' + [...starRoles].join(', ') : ''})`, d.width / 2, d.height / 2);
+    x.fillStyle = "#fff"; x.font = `700 ${d.width * .036}px system-ui`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(`DEMO: ${label} (${payload.mode}${payload.extra ? ':' + payload.extra : ''}${payload.roles ? ': ' + payload.roles.join(', ') : ''})`, d.width / 2, d.height / 2);
     return d;
   }
   const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 120000);
@@ -785,9 +828,7 @@ async function requestAiImage(theme) {
     const res = await fetch(CONFIG.aiEndpoint, {
       method: 'POST', signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', 'X-Booth-Key': CONFIG.boothKey },
-      body: JSON.stringify({ image: c.toDataURL('image/jpeg', 0.88).split(',')[1], theme: theme.id, mode: aiMode,
-                             roles: aiMode === 'star' ? [...starRoles] : undefined,
-                             aspect: nearestAspect(raw.width / raw.height) })
+      body: JSON.stringify({ ...payload, image: c.toDataURL('image/jpeg', 0.88).split(',')[1], aspect: nearestAspect(raw.width / raw.height) })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) throw Object.assign(new Error(data.error || 'HTTP ' + res.status), { userMessage: data.message });
@@ -799,7 +840,7 @@ async function requestAiImage(theme) {
     throw e;
   } finally { clearTimeout(timer); }
 }
-$('aiBtn').onclick = openAi;
+$('aiBtn').onclick = () => openAi();
 
 /* ---------- Take photo flow ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
