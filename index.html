@@ -354,9 +354,9 @@ const CONFIG = {
   idleResetSeconds: 90,        // back to start screen after this long untouched
   keepDays: 7,                 // photos and party galleries stay online this long (match KEEP_DAYS in Netlify)
   slideSeconds: 5,             // start-screen slideshow: seconds per photo
-  takeHomeSeconds: 45,
-  // "AI theme it": your Supabase Edge Function address (Supabase → Edge Functions → ai-theme → URL)
-  aiEndpoint: 'https://dlokammlrjviparqxoib.supabase.co/functions/v1/Ai-theme',         // how long the "Take it home" QR code stays up before returning to the start screen
+  takeHomeSeconds: 45,         // how long the "Take it home" QR code stays up before returning to the start screen
+  // "AI theme it": your Supabase Edge Function address (Supabase → Edge Functions → Ai-theme → URL)
+  aiEndpoint: 'https://dlokammlrjviparqxoib.supabase.co/functions/v1/Ai-theme',
   partyMemoryHours: 8,         // next guest starts with the same text and style for this long
   hostHours: 8,                // a host's party ends automatically after this long
   maxLongEdge: 1920,
