@@ -16,7 +16,7 @@
   .brand { font-family: "Booth Serif", Georgia, serif; font-style: italic; font-size: 2.2rem; line-height: 1.2; margin: 22px 0 4px;
            background: linear-gradient(180deg, var(--olive-light), var(--olive-dark)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .meta { color: var(--muted); font-size: .95rem; margin: 0 16px 14px; text-align: center; }
-  .photo { width: min(92vw, 520px); border-radius: 14px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.5); background: #000; }
+  .photo { width: min(96vw, 560px); margin-top: calc(10px + env(safe-area-inset-top)); border-radius: 14px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.5); background: #000; }
   .photo img { width: 100%; display: block; }
   .actions { display: flex; flex-direction: column; gap: 10px; width: min(92vw, 520px); margin: 18px 0; }
   .btn { border: 0; border-radius: 999px; padding: 15px 22px; font-size: 1.05rem; font-weight: 700; background: var(--olive); color: #fff;
@@ -29,7 +29,6 @@
 </style>
 </head>
 <body>
-<div class="brand">Serendipity</div>
 <div class="meta" id="meta">Loading your photo…</div>
 <div class="photo" id="photoBox" hidden><img id="img" alt="Your photo booth photo"></div>
 <div class="actions" id="actions" hidden>
@@ -49,7 +48,7 @@ const fmtDate = d => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', 
     const d = await r.json();
     if (!r.ok || !d.ok) throw Object.assign(new Error(d.error), { gone: r.status === 404 });
     $('img').src = d.url;
-    $('meta').textContent = `Available until ${fmtDate(d.expires)}`;
+    $('meta').hidden = true;
     $('photoBox').hidden = false; $('actions').hidden = false;
     if (d.party) {
       const a = $('galleryLink'); a.hidden = false;

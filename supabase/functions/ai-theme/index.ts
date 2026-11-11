@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
   const t = THEMES[theme];
   if (!t || !['full', 'background', 'clothing'].includes(mode)) return json(400, { ok: false, error: 'Unknown theme' });
   if (typeof image !== 'string' || !image || image.length > 4_000_000) return json(400, { ok: false, error: 'Bad image' });
-  if (!['9:16', '16:9', '3:4', '4:3', '1:1'].includes(aspect)) return json(400, { ok: false, error: 'Bad aspect' });
+  if (!['9:16', '2:3', '3:4', '4:5', '1:1', '5:4', '4:3', '3:2', '16:9'].includes(aspect)) return json(400, { ok: false, error: 'Bad aspect' });
 
   const limit = parseInt(env('AI_DAILY_LIMIT', '300'), 10);
   if ((await usedToday()) >= limit) return json(429, { ok: false, error: 'limit', message: "AI themes are resting for today – please try again tomorrow!" });

@@ -45,7 +45,7 @@
 </head>
 <body>
 <div id="track"></div>
-<header><div class="brand">Serendipity</div><h1 id="title"></h1></header>
+<header><h1 id="title"></h1></header>
 <button class="nav prev" id="prevBtn" aria-label="Previous photo" hidden>‹</button>
 <button class="nav next" id="nextBtn" aria-label="Next photo" hidden>›</button>
 <button id="newPill" hidden></button>
@@ -69,7 +69,7 @@ function render(d) {
   photos = d.photos;
   document.title = `${d.name} · Serendipity`;
   $('title').textContent = d.name;
-  $('hint').textContent = `Swipe for more · until ${fmtDate(d.expires)}`;
+  $('hint').textContent = 'Swipe for more';
   if (!photos.length) {
     $('msg').hidden = false; $('foot').hidden = true;
     $('msg').innerHTML = 'No photos yet – they’ll appear here as soon as they’re taken. 📸';

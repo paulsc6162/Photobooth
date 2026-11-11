@@ -85,6 +85,8 @@
 
   /* Accept → saving → Take it home (same screen, buttons swap for the QR code) */
   #editBar { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8em; }
+  #editBar, #savingBar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+                         background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.75) 35%); padding: 6vh 3vw 3vh !important; }
   #editBar[hidden] { display: none; }
   #editBar .btn { padding: .75em .5em; }
   .aiBtn { background: linear-gradient(135deg, #5b3fa8, #b0428f) !important; color: #fff !important; }
@@ -132,7 +134,7 @@
 
   /* Camera */
   #camera { background: #000; }
-  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  #video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   #video.mirror { transform: scaleX(-1); }
   #countdown { position: absolute; font-size: min(40vw, 40vh); font-weight: 800; color: #fff;
                text-shadow: 0 0 40px rgba(0,0,0,.6); pointer-events: none; }
@@ -146,7 +148,7 @@
 
   /* Edit / review */
   #edit { background: #000; justify-content: stretch; align-items: stretch; }
-  #photoWrap { flex: 1; min-height: 0; position: relative; }
+  #photoWrap { position: absolute; inset: 0; }
   #photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
   .bar { background: #111; padding: 1.4vh 1.5vw; display: flex; gap: .8em; justify-content: space-between; align-items: center; }
   .bar .group { display: flex; gap: .8em; }
@@ -520,8 +522,8 @@ function resetIdle() {
 /* ---------- Camera ---------- */
 async function startCamera() {
   if (stream) return;
-  const portrait = innerHeight > innerWidth;
-  const c = portrait ? { width: { ideal: 1080 }, height: { ideal: 1920 } } : { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  // Ask for the largest picture the camera offers; it's cropped to the screen's shape when the photo is taken
+  const c = { width: { ideal: 2560 }, height: { ideal: 2560 } };
   if (CONFIG.deviceId) c.deviceId = { exact: CONFIG.deviceId }; else c.facingMode = 'user';
   try { stream = await navigator.mediaDevices.getUserMedia({ video: c, audio: false }); }
   catch { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
@@ -536,15 +538,20 @@ function stopCamera() { if (stream) stream.getTracks().forEach(t => t.stop()); s
 const raw = document.createElement('canvas');      // the photo as taken (already mirrored)
 
 function captureFrame() {
-  const vw = video.videoWidth, vh = video.videoHeight;
-  const s = Math.min(1, CONFIG.maxLongEdge / Math.max(vw, vh));
-  const w = Math.round(vw * s), h = Math.round(vh * s);
+  // Crop the camera picture to the screen's shape (centre crop) – exactly what the guest saw in the live view,
+  // so a portrait tablet always gives a full-screen portrait photo, even if the camera itself is landscape.
+  const vw = video.videoWidth, vh = video.videoHeight, target = innerWidth / innerHeight;
+  let sw = vw, sh = vh;
+  if (vw / vh > target) sw = vh * target; else sh = vw / target;
+  const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
+  const s = Math.min(1, CONFIG.maxLongEdge / Math.max(sw, sh));
+  const w = Math.round(sw * s), h = Math.round(sh * s);
   raw.width = photo.width = w;
   raw.height = photo.height = h;
   const r = raw.getContext('2d');
   r.save();
   if (CONFIG.mirror) { r.translate(w, 0); r.scale(-1, 1); }
-  r.drawImage(video, 0, 0, w, h);
+  r.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
   r.restore();
   aiCanvas = null; aiThemeLabel = '';
   filterCache.clear();
@@ -756,6 +763,10 @@ async function runAi(theme) {
     $('aiSub').textContent = e.userMessage || "Sorry – the AI couldn't do that one. Try another theme, or go back to your photo.";
   }
 }
+function nearestAspect(r) {   // aspect ratios the image AI supports
+  const opts = { '9:16': 9 / 16, '2:3': 2 / 3, '3:4': 3 / 4, '4:5': 4 / 5, '1:1': 1, '5:4': 5 / 4, '4:3': 4 / 3, '3:2': 3 / 2, '16:9': 16 / 9 };
+  return Object.entries(opts).sort((a, b) => Math.abs(a[1] - r) - Math.abs(b[1] - r))[0][0];
+}
 async function requestAiImage(theme) {
   // Send the plain photo (no title or Serendipity strip – those are added afterwards)
   const long = 1536, s = Math.min(1, long / Math.max(raw.width, raw.height));
@@ -776,7 +787,7 @@ async function requestAiImage(theme) {
       method: 'POST', signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', 'X-Booth-Key': CONFIG.boothKey },
       body: JSON.stringify({ image: c.toDataURL('image/jpeg', 0.88).split(',')[1], theme: theme.id, mode: aiMode,
-                             aspect: raw.height > raw.width ? '9:16' : '16:9' })
+                             aspect: nearestAspect(raw.width / raw.height) })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) throw Object.assign(new Error(data.error || 'HTTP ' + res.status), { userMessage: data.message });
@@ -861,9 +872,8 @@ async function uploadPhoto() {
   }
 }
 function showTakeHome(id, expires) {
-  const until = new Date(expires).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   drawQR($('qrPhoto'), pageUrl('p.html', 'i', id));
-  $('thNote').textContent = `Point your phone camera at the code · online until ${until}`;
+  $('thNote').textContent = 'Point your phone camera at the code';
   setEditMode('home');
   clearTimeout(homeTimer);
   homeTimer = setTimeout(() => { if ($('edit').classList.contains('active') && !$('takeHome').hidden) resetAll(); }, CONFIG.takeHomeSeconds * 1000);
