@@ -286,7 +286,7 @@
       <button class="modeBtn" data-mode="full"><span class="mi">🎭</span><span><b>Theme the entire picture</b><small>New outfits and a new background</small></span></button>
       <button class="modeBtn" data-mode="background"><span class="mi">🏞️</span><span><b>Theme the background</b><small>Keep your outfits, change the scene</small></span></button>
       <button class="modeBtn" data-mode="clothing"><span class="mi">👗</span><span><b>Theme the clothing</b><small>Keep the background, change the outfits</small></span></button>
-      <button class="modeBtn" data-mode="star"><span class="mi">⭐</span><span><b>Be the star</b><small>Pick your star look, then where you are</small></span></button>
+      <button class="modeBtn" data-mode="star"><span class="mi">⭐</span><span><b>Be the star</b><small>Pick who you'll be, then where you are</small></span></button>
     </div>
 
     <div class="themeGrid" id="aiThemes" hidden></div>
@@ -700,21 +700,15 @@ function aiShowStep(step) {
   aiStep = step;
   const grid = $('aiThemes'); grid.innerHTML = ''; grid.classList.toggle('roles', step === 'roles');
   $('aiModes').hidden = step !== 'modes'; grid.hidden = step === 'modes';
-  $('aiNext').hidden = step !== 'roles';
+  $('aiNext').hidden = true;
   if (step === 'modes') { $('aiSub').textContent = 'How would you like to theme your photo?'; return; }
   if (step === 'roles') {
-    $('aiSub').textContent = 'Who do you want to be? Pick as many as you like';
+    $('aiSub').textContent = 'Who do you want to be?';
     STAR_ROLES.forEach(r => {
       const tile = tileFor(r);
-      tile.classList.toggle('sel', starRoles.has(r.id));
-      tile.onclick = () => {
-        starRoles.has(r.id) ? starRoles.delete(r.id) : starRoles.add(r.id);
-        tile.classList.toggle('sel', starRoles.has(r.id));
-        $('aiNext').disabled = !starRoles.size; resetIdle();
-      };
+      tile.onclick = () => { starRoles = new Set([r.id]); aiShowStep('themes'); };
       grid.appendChild(tile);
     });
-    $('aiNext').disabled = !starRoles.size;
     return;
   }
   $('aiSub').textContent = MODE_TEXT[aiMode];
