@@ -222,7 +222,9 @@ $('go').onclick = async () => {
       body: JSON.stringify({ ...settings, prompt, images: images.map(i => ({ mime: i.mime, data: i.data })) })
     });
     clearTimeout(timer);
-    const data = await res.json().catch(() => ({}));
+    const text = await res.text();
+    let data = {}; try { data = JSON.parse(text); } catch {}
+    if (res.ok && !data.ok) throw new Error('The picture arrived incomplete (connection blip) – please tap Generate again. If it keeps happening, try Sharpness 1K.');
     if (!res.ok || !data.ok) throw new Error(data.message || ('Error ' + res.status));
     addResult(`data:${data.mime};base64,${data.image}`, settings, Math.round((Date.now() - t0) / 1000), data.note);
     setStatus('✓ Done – see the result below.');
